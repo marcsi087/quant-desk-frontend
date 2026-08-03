@@ -65,3 +65,4 @@ try:
 
 except Exception as e:
     st.error(f"Could not connect to the backend server. Error: {e}")
+    
