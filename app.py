@@ -34,7 +34,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# App Title Header
+# Requested Top Banner Text & App Title Header
+st.markdown("Missy is a cutie")
 st.markdown("## ⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
 st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (EST)")
 
@@ -68,14 +69,16 @@ with st.sidebar:
     st.markdown("### System Status")
     st.success("Backend Render API: **ONLINE**")
     
-    # Restored Live Tracker / Active Trade Manager
+    # Active Trade Manager with 1-Decimal Leverage Slider
     st.markdown("---")
     st.header("🔴 ACTIVE TRADE MANAGER")
     
     trade_side = st.selectbox("Trade Side", ["NONE", "LONG", "SHORT"])
     entry_price = st.number_input("Entry Price ($)", value=0.0, format="%.2f")
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
-    leverage = st.slider("Leverage (x)", 1, 10, 1)
+    
+    # Updated Leverage Slider allowing one decimal place (min 1.0, max 10.0, default 1.0, step 0.1)
+    leverage = st.slider("Leverage (x)", min_value=1.0, max_value=10.0, value=1.0, step=0.1, format="%.1f")
     
     if trade_side != "NONE" and entry_price > 0:
         if trade_side == "LONG":
