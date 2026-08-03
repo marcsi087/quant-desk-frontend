@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS with Enhanced Contrast for Analytical Focus & Spacing
+# 2. Institutional CSS for Clear Column Separation & Clean Typography
 st.markdown("""
     <style>
         .block-container { padding-top: 2.5rem; padding-bottom: 1rem; }
@@ -30,7 +30,6 @@ st.markdown("""
             margin-top: 10px;
             margin-bottom: 10px;
         }
-        /* High-contrast styling for Analytical Focus fields */
         .analytical-box {
             background-color: #1c2536;
             border: 1px solid #3b82f6;
@@ -45,7 +44,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Top Banner Text & App Title Header (with proper top breathing room)
+# Top Banner Text & App Title Header
 st.markdown("### Missy is a cutie ❤️")
 st.markdown("## ⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
 st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (EST)")
@@ -60,9 +59,11 @@ try:
 except Exception:
     data = {}
 
-# Fallbacks and Data Mapping
-spot = data.get("spot_price", 63190.40)
-timestamp = data.get("timestamp", "Live Feed")
+# Live Data Mappings from Backend Engine
+spot = data.get("spot_price", 0.0)
+rsi = data.get("rsi_1h", 50.0)
+oi_trend = data.get("oi_trend", "🟢 RISING")
+kelly = data.get("kelly_pct", 2.5)
 
 # ==========================================
 # SIDEBAR CONTROL CENTER & ACTIVE TRADE MANAGER
@@ -73,9 +74,9 @@ with st.sidebar:
         st.rerun()
     st.markdown("---")
     st.markdown("### Global Plumbing")
-    st.write("**DXY Index:** 99.80")
-    st.write("**US 10Y Yield (TNX):** 4.74%")
-    st.write("**Risk Velocity (ETH/BTC):** 0.0294")
+    st.write(f"**DXY Index:** {data.get('dxy', '99.80')}")
+    st.write(f"**US 10Y Yield (TNX):** {data.get('tnx', '4.74%')}")
+    st.write(f"**Risk Velocity (ETH/BTC):** {data.get('eth_btc', '0.0294')}")
     st.markdown("---")
     st.markdown("### System Status")
     st.success("Backend Render API: **ONLINE**")
@@ -89,7 +90,7 @@ with st.sidebar:
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
     leverage = st.slider("Leverage (x)", min_value=1.0, max_value=50.0, value=1.0, step=0.1, format="%.1f")
     
-    if trade_side != "NONE" and entry_price > 0:
+    if trade_side != "NONE" and entry_price > 0 and spot > 0:
         if trade_side == "LONG":
             roe = ((spot - entry_price) / entry_price) * leverage * 100
         else:
@@ -106,10 +107,10 @@ with st.sidebar:
 # --- TOP GLOBAL METRICS BANNER ---
 gc1, gc2, gc3, gc4, gc5 = st.columns(5)
 gc1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
-gc2.metric("1-Hour RSI", data.get("rsi_1h", "58.7"))
-gc3.metric("Open Interest Trend", data.get("oi_trend", "🟢 RISING"))
-gc4.metric("Kelly Allocation Limit", f"{data.get('kelly_pct', '2.5')}%")
-gc5.metric("Hierarchical Score", "42.8")
+gc2.metric("1-Hour RSI", f"{rsi}")
+gc3.metric("Open Interest Trend", f"{oi_trend}")
+gc4.metric("Kelly Allocation Limit", f"{kelly}%")
+gc5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
 
 st.markdown("---")
 
@@ -128,19 +129,18 @@ with col_macro:
     st.metric("Macro Score Rating", f"{data.get('macro_score', 5.9)} / 10")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown("""
+    st.markdown(f"""
     <div class="playbook-box">
-    <b>Directive:</b> LONG (🐂 BULL EXPANSION)<br>
+    <b>Directive:</b> {data.get('macro_bias', 'LONG (🐂 BULL EXPANSION)')}<br>
     <b>Focus:</b> Structural multi-week trend health, liquidity velocity, and broader macroeconomic expansion.
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
-    st.write(f"**EMA Anchor Entry:** ${63761.52:,.2f}")
-    st.write(f"**Target 1 (2.0x ATR):** ${66763.21:,.2f}")
-    st.write(f"**Structural Invalidation:** ${61577.03:,.2f}")
+    st.write(f"**EMA Anchor Entry:** ${data.get('macro_entry', spot * 0.99):,.2f}")
+    st.write(f"**Target 1 (2.0x ATR):** ${data.get('macro_tp1', spot * 1.05):,.2f}")
+    st.write(f"**Structural Invalidation:** ${data.get('macro_sl', spot * 0.95):,.2f}")
     
-    # High-Contrast Analytical Focus Box
     st.markdown("""
     <div class="analytical-box">
     <b>Analytical Focus:</b><br>
@@ -160,19 +160,18 @@ with col_swing:
     st.metric("Tactical Momentum Score", f"{data.get('tactical_score', 23.3)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown("""
+    st.markdown(f"""
     <div class="playbook-box" style="border-left-color: #f59e0b;">
-    <b>Directive:</b> TACTICAL LIQUIDATION WAVE<br>
+    <b>Directive:</b> {data.get('tactical_bias', 'TACTICAL LIQUIDATION WAVE')}<br>
     <b>Focus:</b> Mid-horizon momentum shifts, volume profile imbalances, and trend continuation triggers.
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
-    st.write(f"**Retest Entry Trigger:** ${63512.95:,.2f}")
-    st.write(f"**Downward Target 1:** ${60511.26:,.2f}")
-    st.write(f"**Tactical Stop Loss:** ${65764.22:,.2f}")
+    st.write(f"**Retest Entry Trigger:** ${data.get('swing_entry', spot * 0.995):,.2f}")
+    st.write(f"**Downward Target 1:** ${data.get('swing_tp1', spot * 0.97):,.2f}")
+    st.write(f"**Tactical Stop Loss:** ${data.get('swing_sl', spot * 1.02):,.2f}")
     
-    # High-Contrast Analytical Focus Box
     st.markdown("""
     <div class="analytical-box">
     <b>Analytical Focus:</b><br>
@@ -192,19 +191,18 @@ with col_micro:
     st.metric("Micro STF Score", f"{data.get('stf_score', 20.9)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown("""
+    st.markdown(f"""
     <div class="playbook-box" style="border-left-color: #10b981;">
-    <b>Directive:</b> ✅ EXECUTE SHORT / FADE<br>
+    <b>Directive:</b> {data.get('micro_bias', '✅ EXECUTE SHORT / FADE')}<br>
     <b>Focus:</b> Intraday order book imbalances, Wilder RSI extremes, and localized volume spikes.
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
     st.write(f"**Live Spot Execution:** ${spot:,.2f}")
-    st.write(f"**Upper ATR Target:** ${63191.21:,.2f}")
-    st.write(f"**Micro Stop Loss:** ${62440.79:,.2f}")
+    st.write(f"**Upper ATR Target:** ${data.get('micro_tp1', spot * 1.01):,.2f}")
+    st.write(f"**Micro Stop Loss:** ${data.get('micro_sl', spot * 0.99):,.2f}")
     
-    # High-Contrast Analytical Focus Box
     st.markdown("""
     <div class="analytical-box">
     <b>Analytical Focus:</b><br>
@@ -221,13 +219,13 @@ st.markdown("### 🛡️ DESK-LEVEL RISK & EXECUTION GATEWAY")
 g1, g2, g3 = st.columns(3)
 
 with g1:
-    st.info("**Hierarchical Base Score:** 42.8 / 100")
+    st.info(f"**Hierarchical Base Score:** {data.get('hierarchical_score', '42.8')} / 100")
     st.write("Synthesizes multi-horizon readings to prevent timeframe contamination.")
 
 with g2:
-    st.error("**Enforced Risk Action:** SCALE DOWN RISK (HEDGE ON)")
+    st.error(f"**Enforced Risk Action:** {data.get('risk_action', 'SCALE DOWN RISK (HEDGE ON)')}")
     st.write("Dynamic risk sizing reduces exposure when timeframes misalign.")
 
 with g3:
-    st.success("**Active Liquidation Walls:** Upper $64,739 | Lower $60,855")
+    st.success(f"**Active Liquidation Walls:** Upper ${data.get('short_wall', '64,739')} | Lower ${data.get('long_wall', '60,855')}")
     st.write("Tracks institutional cluster zones for potential cascading liquidations.")
