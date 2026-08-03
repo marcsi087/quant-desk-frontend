@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Telemetry Matrices, Squeeze Cards, & Directives
+# 2. Institutional CSS for Column Header Boxes, Squeeze Cards, & Directives
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
@@ -20,7 +20,44 @@ st.markdown("""
             padding: 20px;
             margin-bottom: 15px;
         }
-        .metric-title { font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-bottom: 10px; }
+        
+        /* Distinct Column Header Boxes */
+        .col-header-macro {
+            background-color: #1e2530;
+            border: 1px solid #3b82f6;
+            border-radius: 4px;
+            padding: 10px 14px;
+            text-align: center;
+            font-weight: 700;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+        }
+        .col-header-tactical {
+            background-color: #261f11;
+            border: 1px solid #f59e0b;
+            border-radius: 4px;
+            padding: 10px 14px;
+            text-align: center;
+            font-weight: 700;
+            color: #fbbf24;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+        }
+        .col-header-micro {
+            background-color: #063829;
+            border: 1px solid #10b981;
+            border-radius: 4px;
+            padding: 10px 14px;
+            text-align: center;
+            font-weight: 700;
+            color: #34d399;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
+        }
         
         /* Compact Scaled Top Ticker */
         .top-ticker {
@@ -268,7 +305,7 @@ col_macro, col_swing, col_micro = st.columns(3)
 # ------------------------------------------
 with col_macro:
     st.markdown('<div class="column-box">', unsafe_allow_html=True)
-    st.markdown('<div class="metric-title">🌐 1. MACRO HORIZON (2-6 WKS)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="col-header-macro">🌐 1. MACRO HORIZON (2-6 WKS)</div>', unsafe_allow_html=True)
     
     st.metric("Macro Score Rating", f"{data.get('macro_score', 5.9)} / 10")
     
@@ -295,7 +332,7 @@ with col_macro:
 # ------------------------------------------
 with col_swing:
     st.markdown('<div class="column-box">', unsafe_allow_html=True)
-    st.markdown('<div class="metric-title">⚡ 2. TACTICAL SWING (4-24 HRS)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="col-header-tactical">⚡ 2. TACTICAL SWING (4-24 HRS)</div>', unsafe_allow_html=True)
     
     st.metric("Tactical Momentum Score", f"{data.get('tactical_score', 23.3)} / 100")
     
@@ -322,7 +359,7 @@ with col_swing:
 # ------------------------------------------
 with col_micro:
     st.markdown('<div class="column-box">', unsafe_allow_html=True)
-    st.markdown('<div class="metric-title">🎯 3. MICRO STF (1-4 HRS)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="col-header-micro">🎯 3. MICRO STF (1-4 HRS)</div>', unsafe_allow_html=True)
     
     st.metric("Micro STF Score", f"{data.get('stf_score', 20.9)} / 100")
     
