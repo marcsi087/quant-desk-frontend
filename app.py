@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Dedicated Squeeze Module, Scaled Ticker, & Directives
+# 2. Institutional CSS for Compact Squeeze Matrix, Ticker, & Directives
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
@@ -69,14 +69,6 @@ st.markdown("""
             padding: 18px;
             margin-bottom: 20px;
             color: #d1fae5;
-        }
-        .squeeze-card-orange {
-            background-color: #78350f;
-            border: 1px solid #f59e0b;
-            border-radius: 6px;
-            padding: 18px;
-            margin-bottom: 20px;
-            color: #fef3c7;
         }
 
         /* Dynamic Directive Styling with Color Coordination */
@@ -140,7 +132,7 @@ try:
 except Exception:
     data = {}
 
-# Live Data Mappings from Backend Engine
+# Live Data Mappings
 spot = float(data.get("spot_price", 63190.40))
 rsi = data.get("rsi_1h", 58.7)
 oi_trend = data.get("oi_trend", "🟢 RISING")
@@ -207,7 +199,7 @@ st.markdown(f"""
     </div>
     <div class="ticker-item">
         <div class="ticker-label">Kelly Limit</div>
-        <div class="ticker-value">{kelly}%</div>
+        <div class="ticker-value">{data.get('kelly_pct', 2.5)}%</div>
     </div>
     <div class="ticker-item">
         <div class="ticker-label">Execution Gate</div>
@@ -220,18 +212,12 @@ st.markdown(f"""
 # DEDICATED SQUEEZE RISK ASSESSMENT MODULE
 # ==========================================
 upper_squeeze = squeeze_side.upper()
-if "SHORT SQUEEZE" in upper_squeeze:
+if "SHORT SQUEEZE" in upper_squeeze or "LONG SQUEEZE" in upper_squeeze:
     squeeze_card_class = "squeeze-card-red"
-    squeeze_headline = "🚨 HIGH SHORT SQUEEZE VULNERABILITY"
-    squeeze_desc = f"Funding Rate is elevated at **{funding}** with rising Open Interest. Overleveraged short positions face immediate liquidation risk on upward momentum."
-elif "LONG SQUEEZE" in upper_squeeze:
-    squeeze_card_class = "squeeze-card-red"
-    squeeze_headline = "🚨 HIGH LONG SQUEEZE VULNERABILITY"
-    squeeze_desc = f"Funding Rate has turned negative at **{funding}** amidst flushing price action. Overexposed long positions are vulnerable to cascading flush triggers."
+    squeeze_desc = f"Funding Rate is currently at **{funding}** with active Open Interest skew. Market positioning indicates heightened vulnerability to cascading liquidation triggers."
 else:
     squeeze_card_class = "squeeze-card-green"
-    squeeze_headline = "✅ SQUEEZE RISK: BALANCED / NEUTRAL"
-    squeeze_desc = f"Funding Rate is currently stable at **{funding}**. Derivative positioning shows no extreme skew or immediate cascade danger."
+    squeeze_desc = f"Funding Rate is stable at **{funding}**. Derivative positioning shows balanced margin skew with no immediate cascade danger."
 
 st.markdown(f"""
 <div class="{squeeze_card_class}">
@@ -243,7 +229,7 @@ st.markdown(f"""
 st.markdown("---")
 
 # ==========================================
-# HELPER FUNCTION FOR DYNAMIC DIRECTIVE STYLING
+# HELPER FUNCTION FOR DYNAMIC DIRECTIVES
 # ==========================================
 def render_directive_box(bias_text, default_focus):
     upper_text = bias_text.upper()
