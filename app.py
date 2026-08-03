@@ -68,7 +68,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Top Banner Text & App Title Header (Proper spacing)
+# Top Banner Text & App Title Header
 st.markdown("### Missy is a cutie ❤️")
 st.markdown("## ⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
 st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (EST)")
@@ -146,7 +146,7 @@ st.markdown("---")
 # ==========================================
 # HELPER FUNCTION FOR DYNAMIC DIRECTIVE STYLING
 # ==========================================
-def render_directive_box(bias_text, default_focus, default_class):
+def render_directive_box(bias_text, default_focus):
     upper_text = bias_text.upper()
     if "LONG" in upper_text or "BULL" in upper_text or "SUPPORT" in upper_text or "EXECUTE LONG" in upper_text:
         box_class = "directive-green"
