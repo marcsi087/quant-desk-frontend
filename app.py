@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Typography & High-Contrast Boxes
+# 2. Institutional CSS for Compact Header Grid, High-Contrast Boxes, & Typography
 st.markdown("""
     <style>
         .block-container { padding-top: 2rem; padding-bottom: 1rem; }
@@ -39,6 +39,14 @@ st.markdown("""
             color: #bfdbfe;
             font-size: 0.88rem;
             line-height: 1.4;
+        }
+        /* Compact Professional Top Header Bar */
+        .metrics-grid {
+            background-color: #12151c;
+            border: 1px solid #2d3748;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 20px;
         }
         hr { margin: 1rem 0; border-color: #374151; }
     </style>
@@ -105,17 +113,17 @@ with st.sidebar:
         st.info("Awaiting Trade Details...")
 
 # ==========================================
-# TIDY PROFESSIONAL TICKER BANNER (TOP ROW)
+# COMPACT TOP BANNER SECTION (RESTORED SPOT & GATE)
 # ==========================================
 st.markdown("#### 📊 Live Market & Execution Overview")
-banner = st.container(border=True)
-with banner:
-    tk1, tk2, tk3, tk4, tk5 = st.columns(5)
-    tk1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
-    tk2.metric("1-Hour RSI", f"{rsi}")
-    tk3.metric("Open Interest Trend", f"{oi_trend}")
-    tk4.metric("Kelly Allocation Limit", f"{kelly}%")
-    tk5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
+st.markdown('<div class="metrics-grid">', unsafe_allow_html=True)
+tk1, tk2, tk3, tk4, tk5 = st.columns(5)
+tk1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
+tk2.metric("1-Hour RSI", f"{rsi}")
+tk3.metric("Open Interest Trend", f"{oi_trend}")
+tk4.metric("Kelly Allocation Limit", f"{kelly}%")
+tk5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
+st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("---")
 
