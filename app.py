@@ -221,7 +221,7 @@ with st.sidebar:
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
     leverage = st.slider("Leverage (x)", min_value=1.0, max_value=50.0, value=1.0, step=0.1, format="%.1f")
     
-    if trade_side != "NONE" and entry_price > 0 and spot > 0:
+   if trade_side != "NONE" and entry_price > 0 and spot > 0:
         if trade_side == "LONG":
             roe = ((spot - entry_price) / entry_price) * leverage * 100
         else:
@@ -231,8 +231,8 @@ with st.sidebar:
         notional_size = collateral * leverage
         
         st.markdown("### Live Position PnL")
-        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=f"{leverage}x Leverage")
-        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"Notional: ${notional_size:,.2f}")
+        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=f"{leverage}x Leverage", delta_color="inverse" if roe < 0 else "normal")
+        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"Notional: ${notional_size:,.2f}", delta_color="inverse" if pnl < 0 else "normal")
     else:
         st.info("Awaiting Trade Details...")
 # ==========================================
