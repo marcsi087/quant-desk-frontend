@@ -9,10 +9,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Compact Headers, High-Contrast Cards, & Directive Styling
+# 2. Institutional CSS for Compact Top Ticker, Clean Spacing, & Directive Styling
 st.markdown("""
     <style>
-        .block-container { padding-top: 2rem; padding-bottom: 1rem; }
+        .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
         .column-box {
             background-color: #161922;
             border: 1px solid #2d3748;
@@ -22,6 +22,32 @@ st.markdown("""
         }
         .metric-title { font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-bottom: 10px; }
         
+        /* Compact Scaled Top Ticker */
+        .top-ticker {
+            display: flex;
+            justify-content: space-between;
+            background-color: #12151c;
+            border: 1px solid #2d3748;
+            border-radius: 6px;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+        }
+        .ticker-item {
+            text-align: center;
+        }
+        .ticker-label {
+            font-size: 0.7rem;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+        .ticker-value {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #f3f4f6;
+        }
+
         /* Dynamic Directive Styling with Color Coordination */
         .directive-green {
             background-color: #064e3b;
@@ -83,11 +109,12 @@ try:
 except Exception:
     data = {}
 
-# Live Data Mappings from Backend Engine (Guaranteed fallback for spot price)
+# Live Data Mappings from Backend Engine
 spot = float(data.get("spot_price", 63190.40))
 rsi = data.get("rsi_1h", 58.7)
 oi_trend = data.get("oi_trend", "🟢 RISING")
 kelly = data.get("kelly_pct", 2.5)
+exec_gate = data.get("execution_gate", "STAND DOWN")
 
 # ==========================================
 # SIDEBAR CONTROL CENTER & ACTIVE TRADE MANAGER
@@ -129,17 +156,33 @@ with st.sidebar:
         st.info("Awaiting Trade Details...")
 
 # ==========================================
-# COMPACT TOP BANNER SECTION (CLEAN GRID)
+# SCALED TOP TICKER BANNER
 # ==========================================
 st.markdown("#### 📊 Live Market & Execution Overview")
-banner = st.container(border=True)
-with banner:
-    tk1, tk2, tk3, tk4, tk5 = st.columns(5)
-    tk1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
-    tk2.metric("1-Hour RSI", f"{rsi}")
-    tk3.metric("Open Interest Trend", f"{oi_trend}")
-    tk4.metric("Kelly Allocation Limit", f"{kelly}%")
-    tk5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
+st.markdown(f"""
+<div class="top-ticker">
+    <div class="ticker-item">
+        <div class="ticker-label">Live Spot</div>
+        <div class="ticker-value">${spot:,.2f}</div>
+    </div>
+    <div class="ticker-item">
+        <div class="ticker-label">1H RSI</div>
+        <div class="ticker-value">{rsi}</div>
+    </div>
+    <div class="ticker-item">
+        <div class="ticker-label">OI Trend</div>
+        <div class="ticker-value">{oi_trend}</div>
+    </div>
+    <div class="ticker-item">
+        <div class="ticker-label">Kelly Limit</div>
+        <div class="ticker-value">{kelly}%</div>
+    </div>
+    <div class="ticker-item">
+        <div class="ticker-label">Execution Gate</div>
+        <div class="ticker-value">{exec_gate}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
 
