@@ -217,7 +217,7 @@ with st.sidebar:
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
     leverage = st.slider("Leverage (x)", min_value=1.0, max_value=50.0, value=1.0, step=0.1, format="%.1f")
     
-   if trade_side != "NONE" and entry_price > 0 and spot > 0:
+    if trade_side != "NONE" and entry_price > 0 and spot > 0:
         if trade_side == "LONG":
             roe = ((spot - entry_price) / entry_price) * leverage * 100
         else:
@@ -225,7 +225,6 @@ with st.sidebar:
             
         pnl = collateral * (roe / 100)
         
-        # Explicitly format negative values with the minus sign in front of the dollar sign
         roe_delta = f"{roe:,.2f}%"
         pnl_delta = f"-${abs(pnl):,.2f}" if pnl < 0 else f"${pnl:,.2f}"
         
