@@ -52,7 +52,9 @@ except Exception:
 spot = data.get("spot_price", 63190.40)
 timestamp = data.get("timestamp", "Live Feed")
 
-# Sidebar Control Center
+# ==========================================
+# SIDEBAR CONTROL CENTER & ACTIVE TRADE MANAGER
+# ==========================================
 with st.sidebar:
     st.header("⚙️ Terminal Control")
     if st.button("🔄 Force Refresh Data", use_container_width=True):
@@ -65,6 +67,29 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### System Status")
     st.success("Backend Render API: **ONLINE**")
+    
+    # Restored Live Tracker / Active Trade Manager
+    st.markdown("---")
+    st.header("🔴 ACTIVE TRADE MANAGER")
+    
+    trade_side = st.selectbox("Trade Side", ["NONE", "LONG", "SHORT"])
+    entry_price = st.number_input("Entry Price ($)", value=0.0, format="%.2f")
+    collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
+    leverage = st.slider("Leverage (x)", 1, 10, 1)
+    
+    if trade_side != "NONE" and entry_price > 0:
+        if trade_side == "LONG":
+            roe = ((spot - entry_price) / entry_price) * leverage * 100
+        else:
+            roe = ((entry_price - spot) / entry_price) * leverage * 100
+            
+        pnl = collateral * (roe / 100)
+        
+        st.markdown("### Live Position PnL")
+        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=f"{roe:,.2f}%")
+        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"${pnl:,.2f}")
+    else:
+        st.info("Awaiting Trade Details...")
 
 # --- TOP GLOBAL METRICS BANNER ---
 gc1, gc2, gc3, gc4, gc5 = st.columns(5)
