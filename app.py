@@ -166,14 +166,17 @@ st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {d
 # Backend API Endpoint
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/signal"
 
-# Fetch Live Data from Backend API with Safe Fallbacks
+# Fetch Live Data with Spinner & Extended Timeout (Handles Render Cold Starts)
+data = {}
 try:
-    response = requests.get(API_URL, timeout=15)
-    data = response.json() if response.status_code == 200 else {}
+    with st.spinner("🔄 Synchronizing with Quant Desk Backend (Render)..."):
+        response = requests.get(API_URL, timeout=25)
+        if response.status_code == 200:
+            data = response.json()
 except Exception:
     data = {}
 
-# Live Data Mappings
+# Live Data Mappings with Robust Fallbacks
 spot = float(data.get("spot_price", 63190.40))
 rsi = float(data.get("rsi_1h", 58.7))
 oi_trend = data.get("oi_trend", "$18.4B")
@@ -200,7 +203,10 @@ with st.sidebar:
     st.write(f"**Risk Velocity (ETH/BTC):** {data.get('eth_btc', '0.0294')}")
     st.markdown("---")
     st.markdown("### System Status")
-    st.success("Backend Render API: **ONLINE**")
+    if data:
+        st.success("Backend Render API: **ONLINE**")
+    else:
+        st.warning("Backend Render API: **COLD START / WAKING UP...**")
     
     # Active Trade Manager with 50x Max Leverage Slider
     st.markdown("---")
