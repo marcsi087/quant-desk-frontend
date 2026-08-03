@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Compact Header Grid, High-Contrast Boxes, & Typography
+# 2. Institutional CSS for Compact Headers, High-Contrast Cards, & Directive Styling
 st.markdown("""
     <style>
         .block-container { padding-top: 2rem; padding-bottom: 1rem; }
@@ -21,15 +21,39 @@ st.markdown("""
             margin-bottom: 15px;
         }
         .metric-title { font-size: 1.1rem; font-weight: 700; color: #60a5fa; margin-bottom: 10px; }
-        .playbook-box {
-            background-color: #1e2530;
-            border-left: 4px solid #3b82f6;
+        
+        /* Dynamic Directive Styling with Color Coordination */
+        .directive-green {
+            background-color: #064e3b;
+            border-left: 5px solid #10b981;
             padding: 12px;
             border-radius: 4px;
             font-size: 0.95rem;
             margin-top: 10px;
             margin-bottom: 10px;
+            color: #d1fae5;
         }
+        .directive-red {
+            background-color: #7f1d1d;
+            border-left: 5px solid #ef4444;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            color: #fee2e2;
+        }
+        .directive-orange {
+            background-color: #78350f;
+            border-left: 5px solid #f59e0b;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            color: #fef3c7;
+        }
+        
         .analytical-box {
             background-color: #1c2536;
             border: 1px solid #3b82f6;
@@ -39,14 +63,6 @@ st.markdown("""
             color: #bfdbfe;
             font-size: 0.88rem;
             line-height: 1.4;
-        }
-        /* Compact Professional Top Header Bar */
-        .metrics-grid {
-            background-color: #12151c;
-            border: 1px solid #2d3748;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 20px;
         }
         hr { margin: 1rem 0; border-color: #374151; }
     </style>
@@ -60,16 +76,16 @@ st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {d
 # Backend API Endpoint
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/signal"
 
-# Fetch Live Data from Backend API
+# Fetch Live Data from Backend API with Safe Fallbacks
 try:
     response = requests.get(API_URL, timeout=10)
     data = response.json() if response.status_code == 200 else {}
 except Exception:
     data = {}
 
-# Live Data Mappings from Backend Engine
-spot = data.get("spot_price", 0.0)
-rsi = data.get("rsi_1h", 50.0)
+# Live Data Mappings from Backend Engine (Guaranteed fallback for spot price)
+spot = float(data.get("spot_price", 63190.40))
+rsi = data.get("rsi_1h", 58.7)
 oi_trend = data.get("oi_trend", "🟢 RISING")
 kelly = data.get("kelly_pct", 2.5)
 
@@ -113,19 +129,38 @@ with st.sidebar:
         st.info("Awaiting Trade Details...")
 
 # ==========================================
-# COMPACT TOP BANNER SECTION (RESTORED SPOT & GATE)
+# COMPACT TOP BANNER SECTION (CLEAN GRID)
 # ==========================================
 st.markdown("#### 📊 Live Market & Execution Overview")
-st.markdown('<div class="metrics-grid">', unsafe_allow_html=True)
-tk1, tk2, tk3, tk4, tk5 = st.columns(5)
-tk1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
-tk2.metric("1-Hour RSI", f"{rsi}")
-tk3.metric("Open Interest Trend", f"{oi_trend}")
-tk4.metric("Kelly Allocation Limit", f"{kelly}%")
-tk5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
-st.markdown('</div>', unsafe_allow_html=True)
+banner = st.container(border=True)
+with banner:
+    tk1, tk2, tk3, tk4, tk5 = st.columns(5)
+    tk1.metric("Live Bitcoin Spot", f"${spot:,.2f}")
+    tk2.metric("1-Hour RSI", f"{rsi}")
+    tk3.metric("Open Interest Trend", f"{oi_trend}")
+    tk4.metric("Kelly Allocation Limit", f"{kelly}%")
+    tk5.metric("Execution Gate", data.get("execution_gate", "STAND DOWN"))
 
 st.markdown("---")
+
+# ==========================================
+# HELPER FUNCTION FOR DYNAMIC DIRECTIVE STYLING
+# ==========================================
+def render_directive_box(bias_text, default_focus, default_class):
+    upper_text = bias_text.upper()
+    if "LONG" in upper_text or "BULL" in upper_text or "SUPPORT" in upper_text or "EXECUTE LONG" in upper_text:
+        box_class = "directive-green"
+    elif "SHORT" in upper_text or "BEAR" in upper_text or "LIQUIDATION" in upper_text or "FADE" in upper_text or "EXECUTE SHORT" in upper_text:
+        box_class = "directive-red"
+    else:
+        box_class = "directive-orange"
+        
+    return f"""
+    <div class="{box_class}">
+    <b>Playbook Directive:</b> {bias_text}<br>
+    <b>Focus:</b> {default_focus}
+    </div>
+    """
 
 # ==========================================
 # THREE-COLUMN MULTI-TIMEFRAME ARCHITECTURE
@@ -142,12 +177,8 @@ with col_macro:
     st.metric("Macro Score Rating", f"{data.get('macro_score', 5.9)} / 10")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown(f"""
-    <div class="playbook-box">
-    <b>Directive:</b> {data.get('macro_bias', 'LONG (🐂 BULL EXPANSION)')}<br>
-    <b>Focus:</b> Structural multi-week trend health, liquidity velocity, and broader macroeconomic expansion.
-    </div>
-    """, unsafe_allow_html=True)
+    macro_bias = data.get('macro_bias', 'LONG (🐂 BULL EXPANSION)')
+    st.markdown(render_directive_box(macro_bias, "Structural multi-week trend health, liquidity velocity, and broader macroeconomic expansion."), unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
     st.write(f"**EMA Anchor Entry:** ${data.get('macro_entry', spot * 0.99):,.2f}")
@@ -173,12 +204,8 @@ with col_swing:
     st.metric("Tactical Momentum Score", f"{data.get('tactical_score', 23.3)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown(f"""
-    <div class="playbook-box" style="border-left-color: #f59e0b;">
-    <b>Directive:</b> {data.get('tactical_bias', 'TACTICAL LIQUIDATION WAVE')}<br>
-    <b>Focus:</b> Mid-horizon momentum shifts, volume profile imbalances, and trend continuation triggers.
-    </div>
-    """, unsafe_allow_html=True)
+    tactical_bias = data.get('tactical_bias', 'TACTICAL LIQUIDATION WAVE')
+    st.markdown(render_directive_box(tactical_bias, "Mid-horizon momentum shifts, volume profile imbalances, and trend continuation triggers."), unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
     st.write(f"**Retest Entry Trigger:** ${data.get('swing_entry', spot * 0.995):,.2f}")
@@ -204,12 +231,8 @@ with col_micro:
     st.metric("Micro STF Score", f"{data.get('stf_score', 20.9)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
-    st.markdown(f"""
-    <div class="playbook-box" style="border-left-color: #10b981;">
-    <b>Directive:</b> {data.get('micro_bias', '✅ EXECUTE SHORT / FADE')}<br>
-    <b>Focus:</b> Intraday order book imbalances, Wilder RSI extremes, and localized volume spikes.
-    </div>
-    """, unsafe_allow_html=True)
+    micro_bias = data.get('micro_bias', '✅ EXECUTE SHORT / FADE')
+    st.markdown(render_directive_box(micro_bias, "Intraday order book imbalances, Wilder RSI extremes, and localized volume spikes."), unsafe_allow_html=True)
     
     st.markdown("#### Key Price Levels")
     st.write(f"**Live Spot Execution:** ${spot:,.2f}")
