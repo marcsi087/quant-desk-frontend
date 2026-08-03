@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import plotly.graph_objects as go
 from datetime import datetime
+from streamlit_autorefresh import st_autorefresh
 
 # 1. Page Configuration for Desk-Level Terminal Layout
 st.set_page_config(
@@ -9,6 +10,9 @@ st.set_page_config(
     page_icon="⚡", 
     layout="wide"
 )
+
+# Auto-refresh every 5 seconds (5000 milliseconds)
+count = st_autorefresh(interval=5000, limit=None, key="quant_desk_refresh")
 
 # 2. Institutional CSS for Column Header Boxes, Squeeze Cards, & Directives
 st.markdown("""
