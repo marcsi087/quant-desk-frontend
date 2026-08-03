@@ -212,7 +212,7 @@ with st.sidebar:
     else:
         st.warning("Backend Render API: **COLD START / WAKING UP...**")
     
-    # Active Trade Manager with 50x Max Leverage Slider
+    # Active Trade Manager with Custom HTML Display (Zero Redundancy & Precise Color Control)
     st.markdown("---")
     st.header("🔴 ACTIVE TRADE MANAGER")
     
@@ -221,7 +221,7 @@ with st.sidebar:
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
     leverage = st.slider("Leverage (x)", min_value=1.0, max_value=50.0, value=1.0, step=0.1, format="%.1f")
     
-   if trade_side != "NONE" and entry_price > 0 and spot > 0:
+    if trade_side != "NONE" and entry_price > 0 and spot > 0:
         if trade_side == "LONG":
             roe = ((spot - entry_price) / entry_price) * leverage * 100
         else:
@@ -229,10 +229,27 @@ with st.sidebar:
             
         pnl = collateral * (roe / 100)
         notional_size = collateral * leverage
+        pnl_color = "#10b981" if pnl >= 0 else "#ef4444"
         
         st.markdown("### Live Position PnL")
-        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=f"{leverage}x Leverage", delta_color="inverse" if roe < 0 else "normal")
-        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"Notional: ${notional_size:,.2f}", delta_color="inverse" if pnl < 0 else "normal")
+        st.markdown(f"""
+        <div style="background-color: #161922; border: 1px solid #374151; border-radius: 6px; padding: 15px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                <div>
+                    <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">Live ROE</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: {pnl_color};">{roe:+,.2f}%</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.75rem; color: #9ca3af; text-transform: uppercase;">Cash PnL</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: {pnl_color};">${pnl:+,.2f}</div>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #2d3748; padding-top: 8px; font-size: 0.85rem; color: #93c5fd; display: flex; justify-content: space-between;">
+                <span><b>Lev:</b> {leverage}x</span>
+                <span><b>Notional:</b> ${notional_size:,.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.info("Awaiting Trade Details...")
         
