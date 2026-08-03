@@ -9,10 +9,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Clear Column Separation & Clean Typography
+# 2. Institutional CSS with Enhanced Contrast for Analytical Focus & Spacing
 st.markdown("""
     <style>
-        .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
+        .block-container { padding-top: 2.5rem; padding-bottom: 1rem; }
         .column-box {
             background-color: #161922;
             border: 1px solid #2d3748;
@@ -30,11 +30,22 @@ st.markdown("""
             margin-top: 10px;
             margin-bottom: 10px;
         }
+        /* High-contrast styling for Analytical Focus fields */
+        .analytical-box {
+            background-color: #1c2536;
+            border: 1px solid #3b82f6;
+            border-radius: 4px;
+            padding: 12px;
+            margin-top: 15px;
+            color: #bfdbfe;
+            font-size: 0.88rem;
+            line-height: 1.4;
+        }
         hr { margin: 1rem 0; border-color: #374151; }
     </style>
 """, unsafe_allow_html=True)
 
-# Top Banner Text & App Title Header
+# Top Banner Text & App Title Header (with proper top breathing room)
 st.markdown("### Missy is a cutie ❤️")
 st.markdown("## ⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
 st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (EST)")
@@ -129,8 +140,14 @@ with col_macro:
     st.write(f"**Target 1 (2.0x ATR):** ${66763.21:,.2f}")
     st.write(f"**Structural Invalidation:** ${61577.03:,.2f}")
     
-    st.markdown("#### Analytical Focus")
-    st.caption("Maintains core directional bias. Ignores intraday noise and short-term volatility contractions.")
+    # High-Contrast Analytical Focus Box
+    st.markdown("""
+    <div class="analytical-box">
+    <b>Analytical Focus:</b><br>
+    Maintains core directional bias. Ignores intraday noise and short-term volatility contractions.
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -155,8 +172,14 @@ with col_swing:
     st.write(f"**Downward Target 1:** ${60511.26:,.2f}")
     st.write(f"**Tactical Stop Loss:** ${65764.22:,.2f}")
     
-    st.markdown("#### Analytical Focus")
-    st.caption("Filters counter-trend traps. Ensures position scaling aligns with active liquidation walls.")
+    # High-Contrast Analytical Focus Box
+    st.markdown("""
+    <div class="analytical-box">
+    <b>Analytical Focus:</b><br>
+    Filters counter-trend traps. Ensures position scaling aligns with active liquidation walls.
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------
@@ -181,8 +204,14 @@ with col_micro:
     st.write(f"**Upper ATR Target:** ${63191.21:,.2f}")
     st.write(f"**Micro Stop Loss:** ${62440.79:,.2f}")
     
-    st.markdown("#### Analytical Focus")
-    st.caption("Execution timing gate. Validates precise entries and exit points for immediate price action.")
+    # High-Contrast Analytical Focus Box
+    st.markdown("""
+    <div class="analytical-box">
+    <b>Analytical Focus:</b><br>
+    Execution timing gate. Validates precise entries and exit points for immediate price action.
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
