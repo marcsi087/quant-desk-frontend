@@ -168,7 +168,7 @@ API_URL = "https://quant-desk-backend-rata.onrender.com/api/signal"
 
 # Fetch Live Data from Backend API with Safe Fallbacks
 try:
-    response = requests.get(API_URL, timeout=12)
+    response = requests.get(API_URL, timeout=15)
     data = response.json() if response.status_code == 200 else {}
 except Exception:
     data = {}
@@ -425,7 +425,7 @@ if timestamps and price_history and rsi_history:
         )
         st.plotly_chart(fig_rsi, use_container_width=True)
 else:
-    st.info("Loading historical time-series data...")
+    st.info("⏳ Awaiting Telemetry Feed / Synchronizing Time-Series Data...")
 
 # ==========================================
 # GRANULAR TELEMETRY & RAW METRIC AUDIT DRAWER
