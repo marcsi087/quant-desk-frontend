@@ -13,49 +13,42 @@ st.set_page_config(
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
-        .column-box {
-            background-color: #161922;
-            border: 1px solid #2d3748;
-            border-radius: 6px;
-            padding: 20px;
-            margin-bottom: 15px;
-        }
         
         /* Distinct Column Header Boxes */
         .col-header-macro {
-            background-color: #1e2530;
+            background-color: #161922;
             border: 1px solid #3b82f6;
-            border-radius: 4px;
-            padding: 10px 14px;
+            border-radius: 6px;
+            padding: 12px 14px;
             text-align: center;
             font-weight: 700;
             color: #60a5fa;
             margin-bottom: 15px;
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             letter-spacing: 0.05em;
         }
         .col-header-tactical {
-            background-color: #261f11;
+            background-color: #161922;
             border: 1px solid #f59e0b;
-            border-radius: 4px;
-            padding: 10px 14px;
+            border-radius: 6px;
+            padding: 12px 14px;
             text-align: center;
             font-weight: 700;
             color: #fbbf24;
             margin-bottom: 15px;
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             letter-spacing: 0.05em;
         }
         .col-header-micro {
-            background-color: #063829;
+            background-color: #161922;
             border: 1px solid #10b981;
-            border-radius: 4px;
-            padding: 10px 14px;
+            border-radius: 6px;
+            padding: 12px 14px;
             text-align: center;
             font-weight: 700;
             color: #34d399;
             margin-bottom: 15px;
-            font-size: 0.95rem;
+            font-size: 1.05rem;
             letter-spacing: 0.05em;
         }
         
@@ -304,9 +297,7 @@ col_macro, col_swing, col_micro = st.columns(3)
 # COLUMN 1: MACRO STRUCTURAL HORIZON (2-6 WKS)
 # ------------------------------------------
 with col_macro:
-    st.markdown('<div class="column-box">', unsafe_allow_html=True)
     st.markdown('<div class="col-header-macro">🌐 1. MACRO HORIZON (2-6 WKS)</div>', unsafe_allow_html=True)
-    
     st.metric("Macro Score Rating", f"{data.get('macro_score', 5.9)} / 10")
     
     st.markdown("#### 🎯 Playbook Directive")
@@ -324,16 +315,12 @@ with col_macro:
     Maintains core directional bias. Ignores intraday noise and short-term volatility contractions.
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------
 # COLUMN 2: TACTICAL SWING HORIZON (4-24 HRS)
 # ------------------------------------------
 with col_swing:
-    st.markdown('<div class="column-box">', unsafe_allow_html=True)
     st.markdown('<div class="col-header-tactical">⚡ 2. TACTICAL SWING (4-24 HRS)</div>', unsafe_allow_html=True)
-    
     st.metric("Tactical Momentum Score", f"{data.get('tactical_score', 23.3)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
@@ -351,16 +338,12 @@ with col_swing:
     Filters counter-trend traps. Ensures position scaling aligns with active liquidation walls.
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ------------------------------------------
 # COLUMN 3: MICRO STF HORIZON (1-4 HRS)
 # ------------------------------------------
 with col_micro:
-    st.markdown('<div class="column-box">', unsafe_allow_html=True)
     st.markdown('<div class="col-header-micro">🎯 3. MICRO STF (1-4 HRS)</div>', unsafe_allow_html=True)
-    
     st.metric("Micro STF Score", f"{data.get('stf_score', 20.9)} / 100")
     
     st.markdown("#### 🎯 Playbook Directive")
@@ -378,8 +361,6 @@ with col_micro:
     Execution timing gate. Validates precise entries and exit points for immediate price action.
     </div>
     """, unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
 # BOTTOM TIER: ACTIVE DESK EXECUTION GATE
@@ -452,7 +433,7 @@ else:
     regime_desc = f"Market is coiling within a balanced derivative regime (1H RSI at <b>{rsi}</b>). Order book deltas show neutral distribution, signaling a waiting period for macro catalysts or volume expansion."
 
 st.markdown(f"""
-<div class="column-box" style="border-left: 5px solid #60a5fa;">
+<div class="telemetry-box" style="border-left: 5px solid #60a5fa;">
     <h4 style="margin-top: 0; color: #60a5fa;">📋 Executive Desk Narrative: {regime_title}</h4>
     <p style="font-size: 0.95rem; line-height: 1.5; color: #e2e8f0; margin-bottom: 10px;">
         {regime_desc}
