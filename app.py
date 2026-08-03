@@ -145,7 +145,7 @@ except Exception:
 # Live Data Mappings
 spot = float(data.get("spot_price", 63190.40))
 rsi = data.get("rsi_1h", 58.7)
-oi_trend = data.get("oi_trend", "🟢 RISING")
+oi_trend = data.get("oi_trend", "$18.4B")
 funding = data.get("funding_rate", "+0.0026%")
 funding_bybit = data.get("funding_bybit", "+0.0030%")
 squeeze_side = data.get("squeeze_side", "✅ NEUTRAL / BALANCED")
@@ -205,7 +205,7 @@ st.markdown(f"""
         <div class="ticker-value">{rsi}</div>
     </div>
     <div class="ticker-item">
-        <div class="ticker-label">OI Trend</div>
+        <div class="ticker-label">Open Interest</div>
         <div class="ticker-value">{oi_trend}</div>
     </div>
     <div class="ticker-item">
@@ -372,10 +372,11 @@ st.markdown('<div class="telemetry-box">', unsafe_allow_html=True)
 t1, t2, t3, t4 = st.columns(4)
 
 with t1:
-    st.markdown("##### 📈 Order Flow & CVD")
-    st.write(f"**1H CVD:** {data.get('cvd_1h', '+__')}")
-    st.write(f"**24H CVD:** {data.get('cvd_24h', '+__')}")
-    st.write(f"**Taker Buy/Sell Ratio:** {data.get('taker_buy_sell_ratio', '1.0')}")
+    st.markdown("##### 📈 Order Flow & Volume")
+    st.write(f"**24H Quote Volume:** {data.get('volume_24h', 'N/A')}")
+    st.write(f"**24H Price Change:** {data.get('price_change_24h', 'N/A')}")
+    st.write(f"**1H CVD Proxy:** {data.get('cvd_1h', '+__')}")
+    st.write(f"**Taker Buy/Sell:** {data.get('taker_buy_sell_ratio', '1.0')}")
 
 with t2:
     st.markdown("##### ⚡ Derivatives & Funding")
@@ -388,12 +389,12 @@ with t3:
     st.markdown("##### 🌐 Dominance & Volatility")
     st.write(f"**BTC Dominance:** {data.get('btc_dominance', '0%')}")
     st.write(f"**USDT Dominance:** {data.get('tether_dominance', '0%')}")
-    st.write(f"**24H Realized Volatility:** {data.get('realized_vol_24h', '0%')}")
+    st.write(f"**Realized Volatility:** {data.get('realized_vol_24h', '0%')}")
 
 with t4:
     st.markdown("##### 🏛️ Macro Plumbing")
     st.write(f"**DXY Index:** {data.get('dxy', '99.80')}")
     st.write(f"**US 10Y Yield:** {data.get('tnx', '4.74%')}")
-    st.write(f"**Macro Liquidity Proxy:** {data.get('macro_liquidity', 'Expanding')}")
+    st.write(f"**Macro Liquidity:** {data.get('macro_liquidity', 'Expanding')}")
 
 st.markdown('</div>', unsafe_allow_html=True)
