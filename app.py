@@ -11,8 +11,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Auto-refresh every 5 seconds (5000 milliseconds)
-count = st_autorefresh(interval=5000, limit=None, key="quant_desk_refresh")
+# Auto-refresh every 20 seconds (20000 milliseconds)
+count = st_autorefresh(interval=20000, limit=None, key="quant_desk_refresh")
 
 # 2. Institutional CSS for Column Header Boxes, Squeeze Cards, & Directives
 st.markdown("""
