@@ -228,16 +228,13 @@ with st.sidebar:
             roe = ((entry_price - spot) / entry_price) * leverage * 100
             
         pnl = collateral * (roe / 100)
-        
-        roe_delta = f"{roe:,.2f}%"
-        pnl_delta = f"-${abs(pnl):,.2f}" if pnl < 0 else f"${pnl:,.2f}"
+        notional_size = collateral * leverage
         
         st.markdown("### Live Position PnL")
-        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=roe_delta)
-        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=pnl_delta)
+        st.metric("Live ROE (%)", f"{roe:,.2f}%", delta=f"{leverage}x Leverage")
+        st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"Notional: ${notional_size:,.2f}")
     else:
         st.info("Awaiting Trade Details...")
-
 # ==========================================
 # CLEAN TOP TICKER BANNER (CORE METRICS)
 # ==========================================
