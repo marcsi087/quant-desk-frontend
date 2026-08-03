@@ -83,7 +83,7 @@ st.markdown("""
             color: #f3f4f6;
         }
 
-        /* Dedicated Squeeze Risk Module Styling */
+        /* Detailed Squeeze Risk Module Styling */
         .squeeze-card-red {
             background-color: #450a0a;
             border: 1px solid #ef4444;
@@ -178,7 +178,7 @@ rsi = float(data.get("rsi_1h", 58.7))
 oi_trend = data.get("oi_trend", "$18.4B")
 funding = data.get("funding_rate", "+0.0026%")
 funding_bybit = data.get("funding_bybit", "+0.0030%")
-squeeze_side = data.get("squeeze_side", "✅ NEUTRAL / BALANCED")
+squeeze_side = data.get("squeeze_side", "BALANCED / NEUTRAL SQUEEZE RISK")
 exec_gate = data.get("execution_gate", "⏳ STAND DOWN")
 
 # ==========================================
@@ -250,20 +250,27 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# DEDICATED SQUEEZE RISK ASSESSMENT MODULE
+# DETAILED SQUEEZE & TRAPPED COHORT MATRIX
 # ==========================================
 upper_squeeze = squeeze_side.upper()
-if "SHORT SQUEEZE" in upper_squeeze or "LONG SQUEEZE" in upper_squeeze:
+if "SHORT SQUEEZE" in upper_squeeze:
     squeeze_card_class = "squeeze-card-red"
-    squeeze_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) shows active derivative skew. Positioning indicates heightened vulnerability to cascading liquidation triggers."
+    cohort_status = "🚨 TRAPPED COHORT: OVERLEVERAGED SHORTS"
+    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) is positive and expanding. Shorts are heavily exposed and vulnerable to upward stop-hunting sweeps toward upper liquidity walls."
+elif "LONG SQUEEZE" in upper_squeeze:
+    squeeze_card_class = "squeeze-card-red"
+    cohort_status = "🚨 TRAPPED COHORT: OVEREXPOSED LONGS"
+    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) or momentum compression shows longs are crowded. Price is vulnerable to a sharp downside flush / cascade to purge late leverage."
 else:
     squeeze_card_class = "squeeze-card-green"
-    squeeze_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) is stable. Derivative positioning shows balanced margin skew with no immediate cascade danger."
+    cohort_status = "✅ TRAPPED COHORT: BALANCED / NO IMMEDIATE SWEEP"
+    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) is neutral. Neither long nor short cohorts show extreme margin skew or immediate cascade danger."
 
 st.markdown(f"""
 <div class="{squeeze_card_class}">
-    <h4 style="margin: 0 0 8px 0; color: inherit;">⚠️ DEDICATED SQUEEZE RISK MATRIX: {squeeze_side}</h4>
-    <p style="margin: 0; font-size: 0.95rem; line-height: 1.4;">{squeeze_desc}</p>
+    <h4 style="margin: 0 0 6px 0; color: inherit;">⚠️ LIQUIDATION SWEEP RISK MATRIX</h4>
+    <div style="font-size: 1.05rem; font-weight: 700; margin-bottom: 8px;">{cohort_status}</div>
+    <p style="margin: 0; font-size: 0.95rem; line-height: 1.4;">{sweep_desc}</p>
 </div>
 """, unsafe_allow_html=True)
 
