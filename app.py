@@ -270,15 +270,18 @@ st.markdown(f"""
 # ==========================================
 # DETAILED SQUEEZE & TRAPPED COHORT MATRIX
 # ==========================================
+# ==========================================
+# DETAILED SQUEEZE & TRAPPED COHORT MATRIX
+# ==========================================
 upper_squeeze = squeeze_side.upper()
 if "SHORT SQUEEZE" in upper_squeeze:
     squeeze_card_class = "squeeze-card-red"
     cohort_status = "🚨 TRAPPED COHORT: OVERLEVERAGED SHORTS"
-    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) is positive and expanding. Shorts are heavily exposed and vulnerable to upward stop-hunting sweeps toward upper liquidity walls."
+    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**). Shorts are heavily exposed and vulnerable to upward stop-hunting sweeps toward upper liquidity walls."
 elif "LONG SQUEEZE" in upper_squeeze:
     squeeze_card_class = "squeeze-card-red"
     cohort_status = "🚨 TRAPPED COHORT: OVEREXPOSED LONGS"
-    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) or momentum compression shows longs are crowded. Price is vulnerable to a sharp downside flush / cascade to purge late leverage."
+    sweep_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**). Momentum compression shows longs are crowded, leaving price vulnerable to a sharp downside flush / cascade to purge late leverage."
 else:
     squeeze_card_class = "squeeze-card-green"
     cohort_status = "✅ TRAPPED COHORT: BALANCED / NO IMMEDIATE SWEEP"
