@@ -235,6 +235,7 @@ with st.sidebar:
         st.metric("Cash PnL ($)", f"${pnl:,.2f}", delta=f"Notional: ${notional_size:,.2f}", delta_color="inverse" if pnl < 0 else "normal")
     else:
         st.info("Awaiting Trade Details...")
+        
 # ==========================================
 # CLEAN TOP TICKER BANNER (CORE METRICS)
 # ==========================================
