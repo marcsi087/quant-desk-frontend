@@ -144,7 +144,7 @@ except Exception:
 
 # Live Data Mappings
 spot = float(data.get("spot_price", 63190.40))
-rsi = data.get("rsi_1h", 58.7)
+rsi = float(data.get("rsi_1h", 58.7))
 oi_trend = data.get("oi_trend", "$18.4B")
 funding = data.get("funding_rate", "+0.0026%")
 funding_bybit = data.get("funding_bybit", "+0.0030%")
@@ -398,3 +398,33 @@ with t4:
     st.write(f"**Macro Liquidity:** {data.get('macro_liquidity', 'Expanding')}")
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+# ==========================================
+# 🧠 QUANT DESK TELEMETRY SYNTHESIS & NARRATIVE
+# ==========================================
+st.markdown("### 🧠 QUANT DESK TELEMETRY SYNTHESIS & NARRATIVE")
+
+if rsi > 60:
+    regime_title = "🐂 BULLISH MOMENTUM EXPANSION (Overbought Skew)"
+    regime_desc = f"Order flow shows active taker buying, pushing 1H RSI to <b>{rsi}</b>. While primary trend momentum remains upward, elevated cross-venue funding rates indicate stretched leverage, raising the probability of localized liquidity sweeps before continuation."
+elif rsi < 40:
+    regime_title = "🐻 FLUSH / BEARISH COMPRESSION"
+    regime_desc = f"Price action is experiencing downward pressure with 1H RSI sitting at <b>{rsi}</b>. Long liquidations are purging speculative leverage; watch for structural support holding or secondary cascade triggers."
+else:
+    regime_title = "⚖️ RANGE-BOUND CONSOLIDATION / CHOP"
+    regime_desc = f"Market is coiling within a balanced derivative regime (1H RSI at <b>{rsi}</b>). Order book deltas show neutral distribution, signaling a waiting period for macro catalysts or volume expansion."
+
+st.markdown(f"""
+<div class="column-box" style="border-left: 5px solid #60a5fa;">
+    <h4 style="margin-top: 0; color: #60a5fa;">📋 Executive Desk Narrative: {regime_title}</h4>
+    <p style="font-size: 0.95rem; line-height: 1.5; color: #e2e8f0; margin-bottom: 10px;">
+        {regime_desc}
+    </p>
+    <hr style="border-color: #2d3748; margin: 10px 0;">
+    <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem; color: #cbd5e1; line-height: 1.6;">
+        <li><b>Derivative Skew Analysis:</b> Funding alignment between Binance (<b>{funding}</b>) and Bybit (<b>{funding_bybit}</b>) indicates margin skew. Watch open interest velocity for sudden trend exhaustion.</li>
+        <li><b>Volatility & Liquidity Posture:</b> Realized volatility combined with macro liquidity velocity dictates that position sizing should strictly adhere to defined ATR risk bands.</li>
+        <li><b>Actionable Desk Stance:</b> Cross-reference multi-horizon signals before deploying capital. Avoid scaling into momentum extremes without confirming CVD delta support.</li>
+    </ul>
+</div>
+""", unsafe_allow_html=True)
