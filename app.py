@@ -35,7 +35,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Top Banner Text & App Title Header
-st.markdown("Missy is a cutie")
+st.markdown("### Missy is a cutie ❤️")
 st.markdown("## ⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
 st.caption(f"Institutional Decision Matrix & Execution Gateway | System Sync: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (EST)")
 
@@ -76,8 +76,6 @@ with st.sidebar:
     trade_side = st.selectbox("Trade Side", ["NONE", "LONG", "SHORT"])
     entry_price = st.number_input("Entry Price ($)", value=0.0, format="%.2f")
     collateral = st.number_input("Collateral ($)", value=0.0, format="%.2f")
-    
-    # Updated Leverage Slider (min 1.0, max 50.0, default 1.0, step 0.1)
     leverage = st.slider("Leverage (x)", min_value=1.0, max_value=50.0, value=1.0, step=0.1, format="%.1f")
     
     if trade_side != "NONE" and entry_price > 0:
