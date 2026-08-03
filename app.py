@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Compact Squeeze Matrix, Ticker, & Directives
+# 2. Institutional CSS for Telemetry Matrices, Squeeze Cards, & Directives
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
@@ -69,6 +69,16 @@ st.markdown("""
             padding: 18px;
             margin-bottom: 20px;
             color: #d1fae5;
+        }
+
+        /* Telemetry Audit Section Box */
+        .telemetry-box {
+            background-color: #161922;
+            border: 1px solid #374151;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 25px;
+            margin-bottom: 25px;
         }
 
         /* Dynamic Directive Styling with Color Coordination */
@@ -137,6 +147,7 @@ spot = float(data.get("spot_price", 63190.40))
 rsi = data.get("rsi_1h", 58.7)
 oi_trend = data.get("oi_trend", "🟢 RISING")
 funding = data.get("funding_rate", "+0.0026%")
+funding_bybit = data.get("funding_bybit", "+0.0030%")
 squeeze_side = data.get("squeeze_side", "✅ NEUTRAL / BALANCED")
 exec_gate = data.get("execution_gate", "⏳ STAND DOWN")
 
@@ -214,10 +225,10 @@ st.markdown(f"""
 upper_squeeze = squeeze_side.upper()
 if "SHORT SQUEEZE" in upper_squeeze or "LONG SQUEEZE" in upper_squeeze:
     squeeze_card_class = "squeeze-card-red"
-    squeeze_desc = f"Funding Rate is currently at **{funding}** with active Open Interest skew. Market positioning indicates heightened vulnerability to cascading liquidation triggers."
+    squeeze_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) shows active derivative skew. Positioning indicates heightened vulnerability to cascading liquidation triggers."
 else:
     squeeze_card_class = "squeeze-card-green"
-    squeeze_desc = f"Funding Rate is stable at **{funding}**. Derivative positioning shows balanced margin skew with no immediate cascade danger."
+    squeeze_desc = f"Funding Rate (Binance: **{funding}** | Bybit: **{funding_bybit}**) is stable. Derivative positioning shows balanced margin skew with no immediate cascade danger."
 
 st.markdown(f"""
 <div class="{squeeze_card_class}">
@@ -350,3 +361,39 @@ with g2:
 with g3:
     st.success(f"**Active Liquidation Walls:** Upper ${data.get('short_wall', '64,739')} | Lower ${data.get('long_wall', '60,855')}")
     st.write("Tracks institutional cluster zones for potential cascading liquidations.")
+
+# ==========================================
+# GRANULAR TELEMETRY & RAW METRIC AUDIT DRAWER
+# ==========================================
+st.markdown("---")
+st.markdown("### 🔬 GRANULAR TELEMETRY & RAW METRIC AUDIT")
+
+st.markdown('<div class="telemetry-box">', unsafe_allow_html=True)
+t1, t2, t3, t4 = st.columns(4)
+
+with t1:
+    st.markdown("##### 📈 Order Flow & CVD")
+    st.write(f"**1H CVD:** {data.get('cvd_1h', '+__')}")
+    st.write(f"**24H CVD:** {data.get('cvd_24h', '+__')}")
+    st.write(f"**Taker Buy/Sell Ratio:** {data.get('taker_buy_sell_ratio', '1.0')}")
+
+with t2:
+    st.markdown("##### ⚡ Derivatives & Funding")
+    st.write(f"**Binance Funding:** {funding}")
+    st.write(f"**Bybit Funding:** {funding_bybit}")
+    st.write(f"**24H Long Liquidations:** {data.get('liq_24h_longs', '$0')}")
+    st.write(f"**24H Short Liquidations:** {data.get('liq_24h_shorts', '$0')}")
+
+with t3:
+    st.markdown("##### 🌐 Dominance & Volatility")
+    st.write(f"**BTC Dominance:** {data.get('btc_dominance', '0%')}")
+    st.write(f"**USDT Dominance:** {data.get('tether_dominance', '0%')}")
+    st.write(f"**24H Realized Volatility:** {data.get('realized_vol_24h', '0%')}")
+
+with t4:
+    st.markdown("##### 🏛️ Macro Plumbing")
+    st.write(f"**DXY Index:** {data.get('dxy', '99.80')}")
+    st.write(f"**US 10Y Yield:** {data.get('tnx', '4.74%')}")
+    st.write(f"**Macro Liquidity Proxy:** {data.get('macro_liquidity', 'Expanding')}")
+
+st.markdown('</div>', unsafe_allow_html=True)
