@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import plotly.graph_objects as go
 from datetime import datetime
 
 # 1. Page Configuration for Desk-Level Terminal Layout
@@ -167,7 +168,7 @@ API_URL = "https://quant-desk-backend-rata.onrender.com/api/signal"
 
 # Fetch Live Data from Backend API with Safe Fallbacks
 try:
-    response = requests.get(API_URL, timeout=10)
+    response = requests.get(API_URL, timeout=12)
     data = response.json() if response.status_code == 200 else {}
 except Exception:
     data = {}
@@ -180,6 +181,10 @@ funding = data.get("funding_rate", "+0.0026%")
 funding_bybit = data.get("funding_bybit", "+0.0030%")
 squeeze_side = data.get("squeeze_side", "BALANCED / NEUTRAL SQUEEZE RISK")
 exec_gate = data.get("execution_gate", "⏳ STAND DOWN")
+
+timestamps = data.get("timestamps", [])
+price_history = data.get("price_history", [])
+rsi_history = data.get("rsi_history", [])
 
 # ==========================================
 # SIDEBAR CONTROL CENTER & ACTIVE TRADE MANAGER
@@ -386,6 +391,41 @@ with g2:
 with g3:
     st.success(f"**Active Liquidation Walls:** Upper ${data.get('short_wall', '64,739')} | Lower ${data.get('long_wall', '60,855')}")
     st.write("Tracks institutional cluster zones for potential cascading liquidations.")
+
+# ==========================================
+# 📈 REAL-TIME TELEMETRY TREND CHARTS
+# ==========================================
+st.markdown("---")
+st.markdown("### 📉 REAL-TIME TELEMETRY TREND CHARTS (LAST 50 HOURLY CANDLES)")
+
+if timestamps and price_history and rsi_history:
+    chart_col1, chart_col2 = st.columns(2)
+    
+    with chart_col1:
+        st.markdown("##### 📈 BTC Spot Price Action")
+        fig_price = go.Figure()
+        fig_price.add_trace(go.Scatter(x=timestamps, y=price_history, mode='lines', name='Close ($)', line=dict(color='#3b82f6', width=2)))
+        fig_price.update_layout(
+            paper_bgcolor='#161922', plot_bgcolor='#161922', font=dict(color='#f3f4f6'),
+            margin=dict(l=10, r=10, t=10, b=10), height=250,
+            xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#2d3748')
+        )
+        st.plotly_chart(fig_price, use_container_width=True)
+        
+    with chart_col2:
+        st.markdown("##### ⚡ 1H Rolling RSI Velocity")
+        fig_rsi = go.Figure()
+        fig_rsi.add_trace(go.Scatter(x=timestamps, y=rsi_history, mode='lines', name='1H RSI', line=dict(color='#10b981', width=2)))
+        fig_rsi.add_hline(y=70, line_dash="dash", line_color="#ef4444", annotation_text="Overbought (70)")
+        fig_rsi.add_hline(y=30, line_dash="dash", line_color="#3b82f6", annotation_text="Oversold (30)")
+        fig_rsi.update_layout(
+            paper_bgcolor='#161922', plot_bgcolor='#161922', font=dict(color='#f3f4f6'),
+            margin=dict(l=10, r=10, t=10, b=10), height=250,
+            xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#2d3748', range=[0, 100])
+        )
+        st.plotly_chart(fig_rsi, use_container_width=True)
+else:
+    st.info("Loading historical time-series data...")
 
 # ==========================================
 # GRANULAR TELEMETRY & RAW METRIC AUDIT DRAWER
