@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Institutional CSS for Compact Top Ticker, Clean Spacing, & Directive Styling
+# 2. Institutional CSS for Dedicated Squeeze Module, Scaled Ticker, & Directives
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; padding-bottom: 1rem; }
@@ -34,18 +34,49 @@ st.markdown("""
         }
         .ticker-item {
             text-align: center;
+            flex: 1;
+            border-right: 1px solid #2d3748;
+        }
+        .ticker-item:last-child {
+            border-right: none;
         }
         .ticker-label {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             color: #9ca3af;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 2px;
         }
         .ticker-value {
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             font-weight: 700;
             color: #f3f4f6;
+        }
+
+        /* Dedicated Squeeze Risk Module Styling */
+        .squeeze-card-red {
+            background-color: #450a0a;
+            border: 1px solid #ef4444;
+            border-radius: 6px;
+            padding: 18px;
+            margin-bottom: 20px;
+            color: #fee2e2;
+        }
+        .squeeze-card-green {
+            background-color: #064e3b;
+            border: 1px solid #10b981;
+            border-radius: 6px;
+            padding: 18px;
+            margin-bottom: 20px;
+            color: #d1fae5;
+        }
+        .squeeze-card-orange {
+            background-color: #78350f;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 18px;
+            margin-bottom: 20px;
+            color: #fef3c7;
         }
 
         /* Dynamic Directive Styling with Color Coordination */
@@ -113,8 +144,9 @@ except Exception:
 spot = float(data.get("spot_price", 63190.40))
 rsi = data.get("rsi_1h", 58.7)
 oi_trend = data.get("oi_trend", "🟢 RISING")
-kelly = data.get("kelly_pct", 2.5)
-exec_gate = data.get("execution_gate", "STAND DOWN")
+funding = data.get("funding_rate", "+0.0026%")
+squeeze_side = data.get("squeeze_side", "✅ NEUTRAL / BALANCED")
+exec_gate = data.get("execution_gate", "⏳ STAND DOWN")
 
 # ==========================================
 # SIDEBAR CONTROL CENTER & ACTIVE TRADE MANAGER
@@ -156,9 +188,9 @@ with st.sidebar:
         st.info("Awaiting Trade Details...")
 
 # ==========================================
-# SCALED TOP TICKER BANNER
+# CLEAN TOP TICKER BANNER (CORE METRICS)
 # ==========================================
-st.markdown("#### 📊 Live Market & Execution Overview")
+st.markdown("#### 📊 Live Market Overview")
 st.markdown(f"""
 <div class="top-ticker">
     <div class="ticker-item">
@@ -181,6 +213,30 @@ st.markdown(f"""
         <div class="ticker-label">Execution Gate</div>
         <div class="ticker-value">{exec_gate}</div>
     </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# DEDICATED SQUEEZE RISK ASSESSMENT MODULE
+# ==========================================
+upper_squeeze = squeeze_side.upper()
+if "SHORT SQUEEZE" in upper_squeeze:
+    squeeze_card_class = "squeeze-card-red"
+    squeeze_headline = "🚨 HIGH SHORT SQUEEZE VULNERABILITY"
+    squeeze_desc = f"Funding Rate is elevated at **{funding}** with rising Open Interest. Overleveraged short positions face immediate liquidation risk on upward momentum."
+elif "LONG SQUEEZE" in upper_squeeze:
+    squeeze_card_class = "squeeze-card-red"
+    squeeze_headline = "🚨 HIGH LONG SQUEEZE VULNERABILITY"
+    squeeze_desc = f"Funding Rate has turned negative at **{funding}** amidst flushing price action. Overexposed long positions are vulnerable to cascading flush triggers."
+else:
+    squeeze_card_class = "squeeze-card-green"
+    squeeze_headline = "✅ SQUEEZE RISK: BALANCED / NEUTRAL"
+    squeeze_desc = f"Funding Rate is currently stable at **{funding}**. Derivative positioning shows no extreme skew or immediate cascade danger."
+
+st.markdown(f"""
+<div class="{squeeze_card_class}">
+    <h4 style="margin: 0 0 8px 0; color: inherit;">⚠️ DEDICATED SQUEEZE RISK MATRIX: {squeeze_side}</h4>
+    <p style="margin: 0; font-size: 0.95rem; line-height: 1.4;">{squeeze_desc}</p>
 </div>
 """, unsafe_allow_html=True)
 
