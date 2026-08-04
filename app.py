@@ -164,7 +164,7 @@ with col_micro:
 
 st.markdown("---")
 
-# --- DESK-LEVEL RISK & EXECUTION GATEWAY ---
+# --- DESK-LEVEL RISK & Execution GATEWAY ---
 st.markdown("## 🛡️ DESK-LEVEL RISK & EXECUTION GATEWAY")
 rg1, rg2, rg3 = st.columns(3)
 rg1.metric("Hierarchical Base Score", "42.8 / 100")
@@ -210,19 +210,21 @@ else:
                 z=hm_data["z_matrix"], 
                 x=hm_data["time_steps"], 
                 y=hm_data["prices"],
-                colorscale='Magma', # Sleeker dark-to-bright scale
-                zsmooth='best',     # Blends blocks into a fluid surface
+                colorscale='Magma', 
+                zsmooth='best',
                 showscale=True,
                 colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
             ))
+            
+            # FIXED SYNTAX HERE: nested fonts inside the title dictionary
             fig_heatmap.update_layout(
                 height=420, 
                 margin=dict(l=10, r=10, t=30, b=10), 
                 template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)", # Transparent background
+                paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(title="Spot Price ($)", tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0")),
-                xaxis=dict(title="Time (UTC)", showgrid=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0"))
+                yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
+                xaxis=dict(title=dict(text="Time (UTC)", font=dict(color="#8892B0")), showgrid=False, tickfont=dict(color="#8892B0"))
             )
             fig_heatmap.add_hline(y=hm_data["upper_wall"], line_dash="dot", line_color="#FF3366", line_width=2, annotation_text="Upper ATR Wall", annotation_font=dict(color="#FF3366"))
             fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dot", line_color="#00E676", line_width=2, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
@@ -250,14 +252,15 @@ else:
                 fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False
             ))
             
+            # FIXED SYNTAX HERE: nested fonts inside the title dictionary
             fig_skew.update_layout(
                 height=420, 
                 margin=dict(l=10, r=10, t=30, b=10), 
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)", 
                 plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title="Delta (Puts ← 50 → Calls)", autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0")),
-                yaxis=dict(title="Implied Volatility (%)", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0"))
+                xaxis=dict(title=dict(text="Delta (Puts ← 50 → Calls)", font=dict(color="#8892B0")), autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
+                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
             )
             st.plotly_chart(fig_skew, use_container_width=True)
             
