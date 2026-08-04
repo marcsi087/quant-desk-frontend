@@ -46,7 +46,6 @@ LIVE_SPOT_PRICE = telemetry.get("spot_price", 64171.99)
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.header("⚙️ Terminal Controls")
-    
     st.markdown("### 🌐 Global Plumbing")
     st.metric("DXY Index", "99.80", "-0.15")
     st.metric("US 10Y Yield", "4.74%", "+0.02")
@@ -60,7 +59,6 @@ with st.sidebar:
     with col_t2: track_swing = st.toggle("🔴 Swing", value=True)
         
     st.markdown("---")
-    
     if not track_macro and not track_swing:
         st.info("No active trades selected for tracking.")
 
@@ -101,6 +99,9 @@ with header_col2:
         if st.button("🔄 Force Telemetry Sync"):
             get_telemetry.clear()
             st.rerun()
+
+# --- SQUEEZE RISK BANNER RESTORED ---
+st.warning("⚠️ **SYSTEM ALERT: ELEVATED SHORT SQUEEZE RISK** | High negative CVD divergence paired with massive liquidity resting above $65,400.")
 
 st.markdown("## 📊 Live Market Overview")
 m1, m2, m3, m4, m5 = st.columns(5)
@@ -159,7 +160,7 @@ else:
         st.markdown("### 🗺️ Order Book Liquidity Heatmap")
         hm_data = telemetry.get("orderbook_heatmap", {})
         if hm_data:
-            # BLUR REMOVED: Replaced with 'Turbo' for raw, granular orderbook blocks
+            # High-Res Heatmap with Turbo scale (no blur)
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=hm_data["z_matrix"], 
                 x=hm_data["time_steps"], 
@@ -182,7 +183,7 @@ else:
         st.markdown("### 📉 Deribit Volatility Skew")
         vs_data = telemetry.get("volatility_skew", {})
         if vs_data:
-            # HIGHER RESOLUTION CURVE: 40 points plotted without markers for a pure surface look
+            # High-Res Smooth Volatility Surface
             fig_skew = go.Figure()
             fig_skew.add_trace(go.Scatter(
                 x=vs_data["deltas"], y=vs_data["iv_surface"], 
