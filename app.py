@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 import requests
 
 # --- CONFIGURATION ---
-# Pointing specifically to your Render backend
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
 
 st.set_page_config(
@@ -28,6 +27,29 @@ def get_telemetry():
     return None
 
 telemetry = get_telemetry()
+
+# --- SIDEBAR CONTROLS & PLUMBING ---
+with st.sidebar:
+    st.header("⚙️ Terminal Controls")
+    
+    st.markdown("### 🌐 Global Plumbing")
+    st.metric("DXY Index", "99.80", "-0.15")
+    st.metric("US 10Y Yield", "4.74%", "+0.02")
+    st.caption("Expanding Macro Liquidity Proxy")
+    
+    st.markdown("---")
+    
+    st.markdown("### 💼 Active Trade Manager")
+    st.warning("⚠️ RISK OVERRIDE: Active Short")
+    leverage = st.slider("Manual Leverage", min_value=1.0, max_value=25.0, value=12.5, step=0.5)
+    st.caption("System Rec Max Cap: 10.0x")
+    
+    st.markdown("---")
+    
+    st.markdown("### 🔄 API Connection")
+    if st.button("Force Telemetry Sync"):
+        get_telemetry.clear()
+        st.rerun()
 
 # --- HEADER & GLOBAL OVERVIEW ---
 st.title("⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
@@ -112,12 +134,22 @@ else:
         hm_data = telemetry.get("orderbook_heatmap", {})
         if hm_data:
             fig_heatmap = go.Figure(data=go.Heatmap(
-                z=hm_data["z_matrix"], x=hm_data["time_steps"], y=hm_data["prices"],
-                colorscale='Inferno', showscale=False
+                z=hm_data["z_matrix"], 
+                x=hm_data["time_steps"], 
+                y=hm_data["prices"],
+                colorscale='Plasma', 
+                showscale=True,
+                colorbar=dict(title="Depth", thickness=10, len=0.75)
             ))
-            fig_heatmap.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark")
-            fig_heatmap.add_hline(y=hm_data["upper_wall"], line_dash="dash", line_color="red")
-            fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dash", line_color="green")
+            fig_heatmap.update_layout(
+                height=400, 
+                margin=dict(l=10, r=10, t=30, b=10), 
+                template="plotly_dark",
+                yaxis=dict(title="Spot Price ($)", tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
+                xaxis=dict(title="Time (UTC)", showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+            )
+            fig_heatmap.add_hline(y=hm_data["upper_wall"], line_dash="dash", line_color="#FF4B4B", annotation_text="Upper ATR Wall")
+            fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dash", line_color="#00FF00", annotation_text="Lower Support")
             st.plotly_chart(fig_heatmap, use_container_width=True)
     
     with viz_col2:
@@ -125,20 +157,33 @@ else:
         vs_data = telemetry.get("volatility_skew", {})
         if vs_data:
             fig_skew = go.Figure(data=go.Scatter(
-                x=vs_data["deltas"], y=vs_data["iv_surface"], 
-                mode='lines+markers', line=dict(color='#00FFFF', width=2)
+                x=vs_data["deltas"], 
+                y=vs_data["iv_surface"], 
+                mode='lines+markers', 
+                line=dict(color='#00FFFF', width=3, shape='spline'),
+                marker=dict(size=10, symbol='diamond', color='#00FFFF', line=dict(width=1, color='white')),
+                fill='tozeroy',
+                fillcolor='rgba(0, 255, 255, 0.05)'
             ))
-            fig_skew.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark", xaxis=dict(autorange="reversed"))
+            fig_skew.update_layout(
+                height=400, 
+                margin=dict(l=10, r=10, t=30, b=10), 
+                template="plotly_dark", 
+                xaxis=dict(title="Delta (Puts ← 50 → Calls)", autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
+                yaxis=dict(title="Implied Volatility (%)", showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+            )
             st.plotly_chart(fig_skew, use_container_width=True)
             
     st.markdown("---")
     
-    # 3. ON-CHAIN MACRO FLOWS
+    # 3. ON-CHAIN MACRO FLOWS (Color Logic Fixed)
     st.markdown("### ⛓️ On-Chain Exchange Flows")
     oc_data = telemetry.get("onchain_flows", {})
     oc1, oc2, oc3 = st.columns(3)
+    
     with oc1:
-        st.metric("24H BTC Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption", delta_color="inverse")
+        # delta_color defaults to "normal", rendering positive strings as green
+        st.metric("24H BTC Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
     with oc2:
         st.metric("24H Stablecoin Mint Velocity", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power Expansion")
     with oc3:
