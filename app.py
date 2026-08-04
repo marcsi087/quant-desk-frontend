@@ -15,11 +15,33 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Auto-refresh the page every 20 seconds (20,000 milliseconds)
-st_autorefresh(interval=20000, key="data_refresh")
+# --- CUSTOM CSS FOR CLEANER METRICS ---
+st.markdown(
+    """
+    <style>
+    /* Shrink the main metric value font size */
+    [data-testid="stMetricValue"] {
+        font-size: 1.5rem !important; 
+    }
+    /* Shrink the label size and allow text to wrap instead of truncating */
+    [data-testid="stMetricLabel"] {
+        font-size: 0.95rem !important;
+        white-space: normal !important; 
+    }
+    /* Shrink the delta indicator font size */
+    [data-testid="stMetricDelta"] {
+        font-size: 0.85rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# Auto-refresh the page every 30 seconds (30,000 milliseconds)
+st_autorefresh(interval=30000, key="data_refresh")
 
 # --- DATA FETCHING (TALKING TO YOUR BACKEND) ---
-@st.cache_data(ttl=20)
+@st.cache_data(ttl=30)
 def get_telemetry():
     """Fetches all data from your Render backend API."""
     try:
