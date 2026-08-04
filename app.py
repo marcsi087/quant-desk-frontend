@@ -6,6 +6,7 @@ import requests
 
 # --- CONFIGURATION ---
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
+LIVE_SPOT_PRICE = 63816.00  # Centralized live spot price for PnL calculations
 
 st.set_page_config(
     page_title="Quant Desk Multi-Timeframe Terminal",
@@ -39,19 +40,43 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Corrected Trade Manager: Independent Ideas & 50x Manual Cap
+    # Fully Functional Trade Manager with Live PnL
     st.markdown("### 💼 Active Trade Manager")
     
-    st.markdown("**Macro Position (2-6 Wks)**")
-    st.success("🟢 Active Long (Bull Expansion)")
-    macro_lev = st.slider("Macro Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, help="System Max Cap: 10.0x")
-    
-    st.markdown("**Swing Position (4-24 Hrs)**")
-    st.error("🔴 Active Short (Liquidation Wave)")
-    swing_lev = st.slider("Swing Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, help="System Max Cap: 10.0x")
-    
-    st.caption("✅ Independent Trade Ideas Enforced")
-    st.caption("⚠️ System Rec Max Cap: 10.0x")
+    # 1. MACRO LONG POSITION
+    with st.expander("🟢 MACRO: Active Long", expanded=True):
+        st.caption("Multi-Week Bull Expansion")
+        macro_entry = st.number_input("Entry Price ($)", value=63177.84, step=10.0, key="m_entry")
+        macro_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="m_col")
+        macro_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="m_lev")
+        
+        # PnL Math (Long)
+        if macro_entry > 0:
+            macro_roi = ((LIVE_SPOT_PRICE - macro_entry) / macro_entry) * macro_lev * 100
+            macro_pnl = (macro_roi / 100) * macro_collat
+            pnl_color = "#00FF00" if macro_pnl >= 0 else "#FF4B4B"
+            pnl_sign = "+" if macro_pnl >= 0 else ""
+            
+            st.markdown("**Live PnL:**")
+            st.markdown(f"<h3 style='color:{pnl_color}; margin-top:-15px;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h3>", unsafe_allow_html=True)
+
+    # 2. SWING SHORT POSITION
+    with st.expander("🔴 SWING: Active Short", expanded=True):
+        st.caption("Tactical Liquidation Wave")
+        swing_entry = st.number_input("Entry Price ($)", value=63496.92, step=10.0, key="s_entry")
+        swing_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="s_col")
+        swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, key="s_lev")
+        
+        # PnL Math (Short)
+        if swing_entry > 0:
+            swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
+            swing_pnl = (swing_roi / 100) * swing_collat
+            pnl_color_s = "#00FF00" if swing_pnl >= 0 else "#FF4B4B"
+            pnl_sign_s = "+" if swing_pnl >= 0 else ""
+            
+            st.markdown("**Live PnL:**")
+            st.markdown(f"<h3 style='color:{pnl_color_s}; margin-top:-15px;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h3>", unsafe_allow_html=True)
+
 
 # --- HEADER & GLOBAL OVERVIEW ---
 header_col1, header_col2 = st.columns([5, 1])
@@ -68,7 +93,7 @@ with header_col2:
 
 st.markdown("## 📊 Live Market Overview")
 m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("LIVE SPOT", "$63,816.00")
+m1.metric("LIVE SPOT", f"${LIVE_SPOT_PRICE:,.2f}")
 m2.metric("1H RSI", "58.0")
 m3.metric("OPEN INTEREST", "$6.96B")
 m4.metric("KELLY LIMIT", "2.5%")
@@ -97,7 +122,7 @@ with col_micro:
     st.subheader("🎯 3. MICRO STF (1-4 HRS)")
     st.metric("Micro STF Score", "50.0 / 100")
     st.warning("Playbook Directive: ⏳ NEUTRAL / CHOP")
-    st.write("**Live Spot Execution:** $63,816.00")
+    st.write(f"**Live Spot Execution:** ${LIVE_SPOT_PRICE:,.2f}")
     st.write("**Upper ATR Target:** $65,411.40")
 
 st.markdown("---")
