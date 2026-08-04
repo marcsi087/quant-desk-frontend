@@ -22,6 +22,10 @@ st.markdown(
     [data-testid="stMetricValue"] { font-size: 1.4rem !important; }
     [data-testid="stMetricLabel"] { font-size: 0.90rem !important; white-space: normal !important; color: #8892B0 !important; }
     [data-testid="stMetricDelta"] { font-size: 0.85rem !important; }
+    /* Stylize Markdown Tables to look like spreadsheet grids */
+    table { width: 100%; border-collapse: collapse; }
+    th { color: #8892B0; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid #444 !important; }
+    td { font-size: 0.95rem; border-bottom: 1px solid #222 !important; padding: 6px 0px !important; }
     </style>
     """,
     unsafe_allow_html=True
@@ -145,7 +149,7 @@ m4.metric("Kelly Limit", "2.5%")
 m5.metric("Execution Gate", "⏳ STAND DOWN")
 
 # ==========================================
-# SECTION 2: MULTI-TIMEFRAME MATRIX
+# SECTION 2: MULTI-TIMEFRAME MATRIX (SPREADSHEET GRID)
 # ==========================================
 render_header("🧠 Decision Matrix")
 
@@ -153,39 +157,68 @@ col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
     st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
-    st.metric("Macro Score", f"{macro_score} / 10")
+    
     if macro_score >= 6.0:
         st.success("Directive: LONG (🐂 BULL EXPANSION)")
     elif macro_score <= 4.0:
         st.error("Directive: SHORT (🐻 BEAR CONTRACTION)")
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
-    st.caption("**EMA Anchor:** $63,177.84  \n**Target (2.0x ATR):** $67,006.80")
+        
+    st.markdown(f"""
+    | Parameter | Target / Level |
+    | :--- | :--- |
+    | **Macro Score** | `{macro_score} / 10` |
+    | **EMA Anchor** | `$63,177.84` |
+    | **Target (2x ATR)** | `$67,006.80` |
+    """)
 
 with col_swing:
     st.markdown("**⚡ 2. TACTICAL SWING (4-24 HRS)**")
-    st.metric("Tactical Score", f"{swing_score} / 100")
+    
     if swing_score >= 60.0:
         st.success("Directive: TACTICAL LONG RALLY")
     elif swing_score <= 45.0:
         st.error("Directive: TACTICAL LIQUIDATION WAVE")
     else:
         st.warning("Directive: ⏳ CHOP / NO TRADE")
-    st.caption("**Retest Entry:** $63,496.92  \n**Downward Target:** $60,625.20")
+        
+    st.markdown(f"""
+    | Parameter | Target / Level |
+    | :--- | :--- |
+    | **Tactical Score** | `{swing_score} / 100` |
+    | **Retest Entry** | `$63,496.92` |
+    | **Downward Target** | `$60,625.20` |
+    """)
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-    st.metric("Micro Score", f"{micro_score} / 100")
+    
     if micro_score >= 60.0:
         st.success("Directive: 🟢 AGGRESSIVE LONG")
     elif micro_score <= 40.0:
         st.error("Directive: 🔴 AGGRESSIVE SHORT")
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
-    st.caption(f"**Spot Exec:** ${LIVE_SPOT_PRICE:,.2f}  \n**ATR Target:** $65,411.40")
+        
+    st.markdown(f"""
+    | Parameter | Target / Level |
+    | :--- | :--- |
+    | **Micro Score** | `{micro_score} / 100` |
+    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+    | **ATR Target** | `$65,411.40` |
+    """)
 
 # ==========================================
-# SECTION 3: RISK GATEWAY
+# SECTION 3: PLAYBOOK MANIFESTO (PROMOTED)
+# ==========================================
+if insights:
+    render_header("📜 Playbook Manifesto")
+    st.info(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {insights.get('institutional_guidance', 'N/A')}")
+    st.markdown(f"> **🧠 Liquidity Thesis:** {insights.get('liquidity_thesis', 'N/A')}")
+
+# ==========================================
+# SECTION 4: RISK GATEWAY
 # ==========================================
 render_header("🛡️ Desk-Level Risk Gateway")
 
@@ -196,7 +229,7 @@ rg3.metric("Upper Liq Wall", "$65,411")
 rg4.metric("Lower Liq Wall", "$61,582")
 
 # ==========================================
-# SECTION 4: TELEMETRY & CHARTS
+# SECTION 5: TELEMETRY & CHARTS
 # ==========================================
 render_header("🔬 Telemetry & Liquidity")
 
@@ -264,24 +297,21 @@ else:
     with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
 
 # ==========================================
-# SECTION 5: QUANTITATIVE DESK SYNTHESIS
+# SECTION 6: QUANTITATIVE MARKET DATA
 # ==========================================
 if insights:
-    render_header("📝 Quantitative Desk Synthesis")
+    render_header("📝 Quantitative Market Data")
     
-    syn_col1, syn_col2 = st.columns([2, 1.5])
+    vp_col, cat_col = st.columns(2)
     
-    with syn_col1:
-        st.markdown(f"**🧠 Liquidity Thesis**\n> {insights.get('liquidity_thesis', 'N/A')}")
-        st.markdown(f"**🛡️ Institutional Guidance**\n> {insights.get('institutional_guidance', 'N/A')}")
-        
-    with syn_col2:
+    with vp_col:
         st.markdown("**📊 Volume Profile**")
         vp = insights.get("volume_profile", {})
         st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
         st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
         st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
         
+    with cat_col:
         st.markdown("**⚠️ Upcoming Catalysts**")
         for cat in insights.get("catalysts", []):
             st.write(f"- {cat}")
