@@ -210,40 +210,54 @@ else:
                 z=hm_data["z_matrix"], 
                 x=hm_data["time_steps"], 
                 y=hm_data["prices"],
-                colorscale='Plasma', 
+                colorscale='Magma', # Sleeker dark-to-bright scale
+                zsmooth='best',     # Blends blocks into a fluid surface
                 showscale=True,
-                colorbar=dict(title="Depth", thickness=10, len=0.75)
+                colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
             ))
             fig_heatmap.update_layout(
-                height=400, 
+                height=420, 
                 margin=dict(l=10, r=10, t=30, b=10), 
                 template="plotly_dark",
-                yaxis=dict(title="Spot Price ($)", tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
-                xaxis=dict(title="Time (UTC)", showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+                paper_bgcolor="rgba(0,0,0,0)", # Transparent background
+                plot_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(title="Spot Price ($)", tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0")),
+                xaxis=dict(title="Time (UTC)", showgrid=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0"))
             )
-            fig_heatmap.add_hline(y=hm_data["upper_wall"], line_dash="dash", line_color="#FF4B4B", annotation_text="Upper ATR Wall")
-            fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dash", line_color="#00FF00", annotation_text="Lower Support")
+            fig_heatmap.add_hline(y=hm_data["upper_wall"], line_dash="dot", line_color="#FF3366", line_width=2, annotation_text="Upper ATR Wall", annotation_font=dict(color="#FF3366"))
+            fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dot", line_color="#00E676", line_width=2, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
     
     with viz_col2:
         st.markdown("### 📉 Deribit Volatility Skew")
         vs_data = telemetry.get("volatility_skew", {})
         if vs_data:
-            fig_skew = go.Figure(data=go.Scatter(
-                x=vs_data["deltas"], 
-                y=vs_data["iv_surface"], 
-                mode='lines+markers', 
-                line=dict(color='#00FFFF', width=3, shape='spline'),
-                marker=dict(size=10, symbol='diamond', color='#00FFFF', line=dict(width=1, color='white')),
-                fill='tozeroy',
-                fillcolor='rgba(0, 255, 255, 0.05)'
+            fig_skew = go.Figure()
+            
+            # Layer 1: Glow Effect
+            fig_skew.add_trace(go.Scatter(
+                x=vs_data["deltas"], y=vs_data["iv_surface"], 
+                mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'),
+                hoverinfo='skip', showlegend=False
             ))
+            
+            # Layer 2: Main sharp line with hollow markers
+            fig_skew.add_trace(go.Scatter(
+                x=vs_data["deltas"], y=vs_data["iv_surface"], 
+                mode='lines+markers', 
+                line=dict(color='#00FFCC', width=3, shape='spline'),
+                marker=dict(size=10, symbol='diamond', color='#0E1117', line=dict(width=2, color='#00FFCC')),
+                fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False
+            ))
+            
             fig_skew.update_layout(
-                height=400, 
+                height=420, 
                 margin=dict(l=10, r=10, t=30, b=10), 
-                template="plotly_dark", 
-                xaxis=dict(title="Delta (Puts ← 50 → Calls)", autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.1)'),
-                yaxis=dict(title="Implied Volatility (%)", showgrid=True, gridcolor='rgba(255,255,255,0.1)')
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", 
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(title="Delta (Puts ← 50 → Calls)", autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0")),
+                yaxis=dict(title="Implied Volatility (%)", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, titlefont=dict(color="#8892B0"), tickfont=dict(color="#8892B0"))
             )
             st.plotly_chart(fig_skew, use_container_width=True)
             
