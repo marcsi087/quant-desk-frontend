@@ -115,16 +115,18 @@ if FUNDING_RATE < 0:
 else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
-st.markdown("## 📊 Live Market Overview")
+# --- SECTION 1: LIVE MARKET OVERVIEW ---
+st.header("📊 Live Market Overview", divider="gray")
+
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("LIVE SPOT", f"${LIVE_SPOT_PRICE:,.2f}")
 m2.metric("1H RSI", "58.0")
 m3.metric("OPEN INTEREST", "$6.96B")
 m4.metric("KELLY LIMIT", "2.5%")
 m5.metric("EXECUTION GATE", "⏳ STAND DOWN")
-st.markdown("---")
 
-# --- DYNAMIC THREE-PILLAR MATRIX ---
+st.write("") # Quick spacer
+
 col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
@@ -162,18 +164,20 @@ with col_micro:
         st.warning("Playbook Directive: ⏳ NEUTRAL / CHOP")
     st.write(f"**Live Spot Execution:** ${LIVE_SPOT_PRICE:,.2f}")
     st.write("**Upper ATR Target:** $65,411.40")
-st.markdown("---")
 
-# --- RISK GATEWAY ---
-st.markdown("## 🛡️ DESK-LEVEL RISK & EXECUTION GATEWAY")
-rg1, rg2, rg3 = st.columns(3)
+# --- SECTION 2: RISK GATEWAY ---
+st.header("🛡️ Desk-Level Risk & Execution Gateway", divider="gray")
+
+# Converted from 3 columns to 4 columns to isolate the Liquidation Walls perfectly
+rg1, rg2, rg3, rg4 = st.columns(4)
 rg1.metric("Hierarchical Base Score", "42.8 / 100")
 rg2.metric("Enforced Risk Action", "SCALE DOWN RISK (HEDGE ON)")
-rg3.metric("Active Liquidation Walls", "Upper $65,411 | Lower $61,582")
-st.markdown("---")
+rg3.metric("Upper Liquidation Wall", "$65,411")
+rg4.metric("Lower Liquidation Wall", "$61,582")
 
-# --- TELEMETRY & CHARTS ---
-st.markdown("## 🔬 INSTITUTIONAL DESK TELEMETRY & LIQUIDITY")
+# --- SECTION 3: TELEMETRY & CHARTS ---
+st.header("🔬 Institutional Desk Telemetry & Liquidity", divider="gray")
+
 if not telemetry:
     st.error("⚠️ Backend API is currently unreachable or booting up. Please wait 30 seconds and refresh...")
 else:
@@ -183,7 +187,8 @@ else:
     with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""))
     with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""))
     with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
-    st.markdown("---")
+    
+    st.write("") # Quick spacer
     
     viz_col1, viz_col2 = st.columns([2, 1])
     with viz_col1:
@@ -232,7 +237,8 @@ else:
             )
             st.plotly_chart(fig_skew, use_container_width=True)
             
-    st.markdown("---")
+    st.write("") # Quick spacer
+    
     st.markdown("### ⛓️ On-Chain Exchange Flows")
     oc_data = telemetry.get("onchain_flows", {})
     oc1, oc2, oc3 = st.columns(3)
