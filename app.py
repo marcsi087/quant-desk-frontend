@@ -318,12 +318,12 @@ else:
     with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
 
 # ==========================================
-# SECTION 6: QUANTITATIVE MARKET DATA
+# SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
 # ==========================================
 if insights:
-    render_header("📝 Quantitative Market Data")
+    render_header("📝 Quantitative Market Data & Guidance")
     
-    vp_col, cat_col = st.columns(2)
+    vp_col, cat_col, guide_col = st.columns(3)
     
     with vp_col:
         st.markdown("**📊 Volume Profile**")
@@ -336,3 +336,7 @@ if insights:
         st.markdown("**⚠️ Upcoming Catalysts**")
         for cat in insights.get("catalysts", []):
             st.write(f"- {cat}")
+            
+    with guide_col:
+        st.markdown("**🧭 Desk-Level Action Plan**")
+        st.info("Execute scaling limits only at structural value nodes. Monitor funding rate bleed closely for squeeze continuation.")
