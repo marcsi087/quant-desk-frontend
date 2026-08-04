@@ -50,20 +50,33 @@ telemetry = get_telemetry()
 LIVE_SPOT_PRICE = telemetry.get("spot_price", 64171.99)
 FUNDING_RATE = telemetry.get("funding_rate", -0.00018)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
+OPEN_INTEREST = telemetry.get("open_interest", "$6.96B")
 
+ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 64000.00})
 scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
 macro_score = scores.get("macro", 6.2)
 swing_score = scores.get("swing", 42.0)
 micro_score = scores.get("micro", 50.0)
 
+plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
+
+# --- EXECUTION GATE LOGIC ---
+if macro_score >= 6.0 and swing_score >= 60.0 and micro_score >= 60.0:
+    exec_gate = "🟢 FULL DEPLOY (LONG)"
+elif macro_score <= 4.0 and swing_score <= 45.0 and micro_score <= 40.0:
+    exec_gate = "🔴 FULL DEPLOY (SHORT)"
+elif (macro_score >= 6.0 and swing_score <= 45.0) or (macro_score <= 4.0 and swing_score >= 60.0):
+    exec_gate = "🟡 HEDGE REQUIRED"
+else:
+    exec_gate = "⏳ STAND DOWN"
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
-    st.metric("DXY Index", "99.80", "-0.15")
-    st.metric("US 10Y Yield", "4.74%", "+0.02")
+    st.metric("DXY Index", plumbing.get("dxy", "99.80"), "-0.15")
+    st.metric("US 10Y Yield", plumbing.get("us10y", "4.74%"), "+0.02")
     st.caption("Expanding Macro Liquidity Proxy")
     
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
@@ -141,12 +154,13 @@ def render_header(title):
 # ==========================================
 render_header("📊 Live Market Overview")
 
-m1, m2, m3, m4, m5 = st.columns(5)
+m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-m2.metric("1H RSI", "58.0")
-m3.metric("Open Interest", "$6.96B")
-m4.metric("Kelly Limit", "2.5%")
-m5.metric("Execution Gate", "⏳ STAND DOWN")
+m2.metric("1H RSI", f"{ta.get('rsi', '58.0')}")
+m3.metric("1H VWAP", f"${ta.get('vwap', 64000.0):,.2f}")
+m4.metric("Open Interest", OPEN_INTEREST)
+m5.metric("Kelly Limit", "2.5%")
+m6.metric("Execution Gate", exec_gate)
 
 # ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX (SPREADSHEET GRID)
@@ -210,12 +224,20 @@ with col_micro:
     """)
 
 # ==========================================
-# SECTION 3: PLAYBOOK MANIFESTO (PROMOTED)
+# SECTION 3: PLAYBOOK MANIFESTO
 # ==========================================
 if insights:
     render_header("📜 Playbook Manifesto")
-    st.info(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {insights.get('institutional_guidance', 'N/A')}")
-    st.markdown(f"> **🧠 Liquidity Thesis:** {insights.get('liquidity_thesis', 'N/A')}")
+    
+    if macro_score >= 6.0:
+        playbook_color = st.success
+    elif macro_score <= 4.0:
+        playbook_color = st.error
+    else:
+        playbook_color = st.info
+    
+    playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {insights.get('institutional_guidance', 'N/A')}")
+    playbook_color(f"**🧠 LIQUIDITY THESIS:** {insights.get('liquidity_thesis', 'N/A')}")
 
 # ==========================================
 # SECTION 4: RISK GATEWAY
