@@ -46,17 +46,18 @@ def get_telemetry():
 telemetry = get_telemetry()
 
 # PULL LIVE TELEMETRY VARIABLES
-LIVE_SPOT_PRICE = telemetry.get("spot_price", 64171.99)
-FUNDING_RATE = telemetry.get("funding_rate", -0.00018)
+LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
+FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
 OPEN_INTEREST = telemetry.get("open_interest", "$7.02B")
 
-ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 64000.00})
+ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00})
 scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
 macro_score = scores.get("macro", 6.2)
 swing_score = scores.get("swing", 42.0)
 micro_score = scores.get("micro", 50.0)
 
+setups = telemetry.get("trade_setups", {})
 plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
 
@@ -104,9 +105,9 @@ with st.sidebar:
 
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
-            swing_entry = st.number_input("Entry Price ($)", value=63873.00, step=10.0, key="s_entry")
-            swing_collat = st.number_input("Collateral ($)", value=378.00, step=100.0, key="s_col")
-            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=21.0, step=0.5, key="s_lev")
+            swing_entry = st.number_input("Entry Price ($)", value=64260.00, step=10.0, key="s_entry")
+            swing_collat = st.number_input("Collateral ($)", value=319.00, step=100.0, key="s_col")
+            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=30.0, step=0.5, key="s_lev")
             if swing_entry > 0:
                 swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
                 swing_pnl = (swing_roi / 100) * swing_collat
@@ -156,13 +157,13 @@ render_header("📊 Live Market Overview")
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
 m2.metric("1H RSI", f"{ta.get('rsi', 58.0)}")
-m3.metric("1H VWAP", f"${ta.get('vwap', 64000.0):,.2f}")
+m3.metric("1H VWAP", f"${ta.get('vwap', 63888.0):,.2f}")
 m4.metric("Open Interest", OPEN_INTEREST)
 m5.metric("Kelly Limit", "2.5%")
 m6.metric("Execution Gate", exec_gate)
 
 # ==========================================
-# SECTION 2: MULTI-TIMEFRAME MATRIX (SPREADSHEET GRID)
+# SECTION 2: MULTI-TIMEFRAME MATRIX (SPREADSHEET GRID W/ T1, T2, SL)
 # ==========================================
 render_header("🧠 Decision Matrix")
 
@@ -170,7 +171,6 @@ col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
     st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
-    
     if macro_score >= 6.0:
         st.success("Directive: LONG (🐂 BULL EXPANSION)")
     elif macro_score <= 4.0:
@@ -178,17 +178,19 @@ with col_macro:
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
         
+    m_setups = setups.get("macro", {})
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
     | **Macro Score** | `{macro_score} / 10` |
-    | **EMA Anchor** | `$63,177.84` |
-    | **Target (2x ATR)** | `$67,006.80` |
+    | **Entry Zone** | `${m_setups.get('entry', 63177):,.2f}` |
+    | **Conservative T1** | `${m_setups.get('t1', 66000):,.2f}` |
+    | **Aggressive T2** | `${m_setups.get('t2', 68200):,.2f}` |
+    | **Stop Loss (SL)** | `${m_setups.get('sl', 62400):,.2f}` |
     """)
 
 with col_swing:
     st.markdown("**⚡ 2. TACTICAL SWING (4-24 HRS)**")
-    
     if swing_score >= 60.0:
         st.success("Directive: TACTICAL LONG RALLY")
     elif swing_score <= 45.0:
@@ -196,17 +198,19 @@ with col_swing:
     else:
         st.warning("Directive: ⏳ CHOP / NO TRADE")
         
+    s_setups = setups.get("tactical", {})
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
     | **Tactical Score** | `{swing_score} / 100` |
-    | **Retest Entry** | `$63,496.92` |
-    | **Downward Target** | `$60,625.20` |
+    | **Entry Zone** | `${s_setups.get('entry', LIVE_SPOT_PRICE):,.2f}` |
+    | **Conservative T1** | `${s_setups.get('t1', 63850):,.2f}` |
+    | **Aggressive T2** | `${s_setups.get('t2', 62800):,.2f}` |
+    | **Stop Loss (SL)** | `${s_setups.get('sl', 65411):,.2f}` |
     """)
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-    
     if micro_score >= 60.0:
         st.success("Directive: 🟢 AGGRESSIVE LONG")
     elif micro_score <= 40.0:
@@ -214,12 +218,15 @@ with col_micro:
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
         
+    mi_setups = setups.get("micro", {})
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
     | **Micro Score** | `{micro_score} / 100` |
     | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-    | **ATR Target** | `$65,411.40` |
+    | **Conservative T1** | `${mi_setups.get('t1', 65000):,.2f}` |
+    | **Aggressive T2** | `${mi_setups.get('t2', 65411):,.2f}` |
+    | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600):,.2f}` |
     """)
 
 # ==========================================
@@ -227,7 +234,6 @@ with col_micro:
 # ==========================================
 if insights:
     render_header("📜 Playbook Manifesto")
-    
     if macro_score >= 6.0:
         playbook_color = st.success
     elif macro_score <= 4.0:
