@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS FOR CLEANER METRICS ---
+# --- CUSTOM CSS ---
 st.markdown(
     """
     <style>
@@ -41,7 +41,16 @@ def get_telemetry():
     return {}
 
 telemetry = get_telemetry()
+
+# PULL LIVE TELEMETRY VARIABLES
 LIVE_SPOT_PRICE = telemetry.get("spot_price", 64171.99)
+FUNDING_RATE = telemetry.get("funding_rate", -0.00018)
+FUNDING_RATE_PCT = FUNDING_RATE * 100
+
+scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
+macro_score = scores.get("macro", 6.2)
+swing_score = scores.get("swing", 42.0)
+micro_score = scores.get("micro", 50.0)
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
@@ -100,8 +109,11 @@ with header_col2:
             get_telemetry.clear()
             st.rerun()
 
-# --- SQUEEZE RISK BANNER RESTORED W/ FUNDING RATES ---
-st.warning("⚠️ **SYSTEM ALERT: ELEVATED SHORT SQUEEZE RISK** | **Avg Perp Funding: -0.018%** | High negative CVD divergence paired with massive liquidity resting above $65,400.")
+# --- DYNAMIC RISK BANNER ---
+if FUNDING_RATE < 0:
+    st.warning(f"⚠️ **SYSTEM ALERT: ELEVATED SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | High negative CVD divergence paired with massive liquidity resting above $65,400.")
+else:
+    st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
 st.markdown("## 📊 Live Market Overview")
 m1, m2, m3, m4, m5 = st.columns(5)
@@ -117,49 +129,37 @@ col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
     st.subheader("🌐 1. MACRO HORIZON (2-6 WKS)")
-    macro_score = 6.2  # This drives the logic below
     st.metric("Macro Score Rating", f"{macro_score} / 10")
-    
-    # Conditional Alerting
     if macro_score >= 6.0:
         st.success("Playbook Directive: LONG (🐂 BULL EXPANSION)")
     elif macro_score <= 4.0:
         st.error("Playbook Directive: SHORT (🐻 BEAR CONTRACTION)")
     else:
         st.warning("Playbook Directive: ⏳ NEUTRAL / CHOP")
-        
     st.write("**EMA Anchor Entry:** $63,177.84")
     st.write("**Target 1 (2.0x ATR):** $67,006.80")
 
 with col_swing:
     st.subheader("⚡ 2. TACTICAL SWING (4-24 HRS)")
-    swing_score = 42.0  # This drives the logic below
     st.metric("Tactical Momentum Score", f"{swing_score} / 100")
-    
-    # Conditional Alerting
     if swing_score >= 60.0:
         st.success("Playbook Directive: TACTICAL LONG RALLY")
     elif swing_score <= 45.0:
         st.error("Playbook Directive: TACTICAL LIQUIDATION WAVE")
     else:
         st.warning("Playbook Directive: ⏳ CHOP / NO TRADE")
-        
     st.write("**Retest Entry Trigger:** $63,496.92")
     st.write("**Downward Target 1:** $60,625.20")
 
 with col_micro:
     st.subheader("🎯 3. MICRO STF (1-4 HRS)")
-    micro_score = 50.0  # This drives the logic below
     st.metric("Micro STF Score", f"{micro_score} / 100")
-    
-    # Conditional Alerting
     if micro_score >= 60.0:
         st.success("Playbook Directive: 🟢 AGGRESSIVE LONG")
     elif micro_score <= 40.0:
         st.error("Playbook Directive: 🔴 AGGRESSIVE SHORT")
     else:
         st.warning("Playbook Directive: ⏳ NEUTRAL / CHOP")
-        
     st.write(f"**Live Spot Execution:** ${LIVE_SPOT_PRICE:,.2f}")
     st.write("**Upper ATR Target:** $65,411.40")
 st.markdown("---")
@@ -190,7 +190,6 @@ else:
         st.markdown("### 🗺️ Order Book Liquidity Heatmap")
         hm_data = telemetry.get("orderbook_heatmap", {})
         if hm_data:
-            # High-Res Heatmap with Turbo scale (no blur)
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=hm_data["z_matrix"], 
                 x=hm_data["time_steps"], 
@@ -213,7 +212,6 @@ else:
         st.markdown("### 📉 Deribit Volatility Skew")
         vs_data = telemetry.get("volatility_skew", {})
         if vs_data:
-            # High-Res Smooth Volatility Surface
             fig_skew = go.Figure()
             fig_skew.add_trace(go.Scatter(
                 x=vs_data["deltas"], y=vs_data["iv_surface"], 
