@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import requests
+from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
-LIVE_SPOT_PRICE = 63816.00  # Centralized live spot price for PnL calculations
 
 st.set_page_config(
     page_title="Quant Desk Multi-Timeframe Terminal",
@@ -14,6 +14,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Auto-refresh the page every 20 seconds (20,000 milliseconds)
+st_autorefresh(interval=20000, key="data_refresh")
 
 # --- DATA FETCHING (TALKING TO YOUR BACKEND) ---
 @st.cache_data(ttl=20)
@@ -25,9 +28,12 @@ def get_telemetry():
             return response.json()
     except:
         pass
-    return None
+    return {}
 
 telemetry = get_telemetry()
+
+# Pull the live spot price directly from backend telemetry, fallback to 63816.00
+LIVE_SPOT_PRICE = telemetry.get("spot_price", 63816.00)
 
 # --- SIDEBAR CONTROLS & PLUMBING ---
 with st.sidebar:
@@ -43,7 +49,6 @@ with st.sidebar:
     # Fully Functional Trade Manager with Selection Toggles
     st.markdown("### 💼 Active Trade Manager")
     
-    # Toggles to select which trades to track
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         track_macro = st.toggle("🟢 Macro", value=True)
@@ -63,7 +68,6 @@ with st.sidebar:
             macro_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="m_col")
             macro_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="m_lev")
             
-            # PnL Math (Long)
             if macro_entry > 0:
                 macro_roi = ((LIVE_SPOT_PRICE - macro_entry) / macro_entry) * macro_lev * 100
                 macro_pnl = (macro_roi / 100) * macro_collat
@@ -81,7 +85,6 @@ with st.sidebar:
             swing_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="s_col")
             swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, key="s_lev")
             
-            # PnL Math (Short)
             if swing_entry > 0:
                 swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
                 swing_pnl = (swing_roi / 100) * swing_collat
@@ -97,7 +100,6 @@ with header_col1:
     st.title("⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
     st.caption("Institutional Decision Matrix & Execution Gateway")
 with header_col2:
-    # Settings Dropdown at the Top Right
     with st.popover("⚙️ Settings"):
         st.markdown("**API Connection**")
         if st.button("🔄 Force Telemetry Sync"):
