@@ -15,15 +15,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CUSTOM CSS (Tightened for less clutter) ---
+# --- CUSTOM CSS ---
 st.markdown(
     """
     <style>
     [data-testid="stMetricValue"] { font-size: 1.4rem !important; }
     [data-testid="stMetricLabel"] { font-size: 0.90rem !important; white-space: normal !important; color: #8892B0 !important; }
     [data-testid="stMetricDelta"] { font-size: 0.85rem !important; }
-    /* Compact standard markdown spacing */
-    .stMarkdown { margin-bottom: -10px; }
     </style>
     """,
     unsafe_allow_html=True
@@ -54,22 +52,24 @@ macro_score = scores.get("macro", 6.2)
 swing_score = scores.get("swing", 42.0)
 micro_score = scores.get("micro", 50.0)
 
+insights = telemetry.get("insights", {})
+
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
-    st.markdown("<h3 style='margin-bottom:0;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
-    st.markdown("<h5 style='color:#8892B0;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
+    st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
+    st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
     st.metric("DXY Index", "99.80", "-0.15")
     st.metric("US 10Y Yield", "4.74%", "+0.02")
     st.caption("Expanding Macro Liquidity Proxy")
     
-    st.markdown("<hr style='border:1px solid #333; margin: 15px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
     
-    st.markdown("<h5 style='color:#8892B0;'>💼 Active Trade Manager</h5>", unsafe_allow_html=True)
+    st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>💼 Active Trade Manager</h5>", unsafe_allow_html=True)
     col_t1, col_t2 = st.columns(2)
     with col_t1: track_macro = st.toggle("🟢 Macro", value=True)
     with col_t2: track_swing = st.toggle("🔴 Swing", value=True)
         
-    st.markdown("<hr style='border:1px solid #333; margin: 15px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
     
     if not track_macro and not track_swing:
         st.info("No active trades selected.")
@@ -84,7 +84,7 @@ with st.sidebar:
                 macro_pnl = (macro_roi / 100) * macro_collat
                 pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
                 pnl_sign = "+" if macro_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
@@ -96,7 +96,7 @@ with st.sidebar:
                 swing_pnl = (swing_roi / 100) * swing_collat
                 pnl_color_s = "#00E676" if swing_pnl >= 0 else "#FF3366"
                 pnl_sign_s = "+" if swing_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
 # --- HEADER & OVERVIEW ---
 header_col1, header_col2 = st.columns([5, 1])
@@ -117,9 +117,25 @@ else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
 # ==========================================
+# HELPER FUNCTION FOR CLEAN HEADERS
+# ==========================================
+def render_header(title):
+    st.markdown(f"""
+        <h4 style='
+            color: #E0E0E0; 
+            border-bottom: 1px solid #333; 
+            padding-bottom: 10px; 
+            margin-top: 40px; 
+            margin-bottom: 25px; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+        '>{title}</h4>
+    """, unsafe_allow_html=True)
+
+# ==========================================
 # SECTION 1: LIVE MARKET OVERVIEW
 # ==========================================
-st.markdown("<h4 style='border-bottom: 1px solid #444; padding-bottom: 8px; color: #E0E0E0; margin-top: 20px; text-transform: uppercase;'>📊 Live Market Overview</h4>", unsafe_allow_html=True)
+render_header("📊 Live Market Overview")
 
 m1, m2, m3, m4, m5 = st.columns(5)
 m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
@@ -131,7 +147,7 @@ m5.metric("Execution Gate", "⏳ STAND DOWN")
 # ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX
 # ==========================================
-st.markdown("<h4 style='border-bottom: 1px solid #444; padding-bottom: 8px; color: #E0E0E0; margin-top: 30px; text-transform: uppercase;'>🧠 Decision Matrix</h4>", unsafe_allow_html=True)
+render_header("🧠 Decision Matrix")
 
 col_macro, col_swing, col_micro = st.columns(3)
 
@@ -171,9 +187,8 @@ with col_micro:
 # ==========================================
 # SECTION 3: RISK GATEWAY
 # ==========================================
-st.markdown("<h4 style='border-bottom: 1px solid #444; padding-bottom: 8px; color: #E0E0E0; margin-top: 30px; text-transform: uppercase;'>🛡️ Desk-Level Risk Gateway</h4>", unsafe_allow_html=True)
+render_header("🛡️ Desk-Level Risk Gateway")
 
-# 4 Columns - Clean, concise labels so they fit perfectly
 rg1, rg2, rg3, rg4 = st.columns(4)
 rg1.metric("Risk Base Score", "42.8 / 100")
 rg2.metric("Desk Directive", "SCALE DOWN (HEDGE)")
@@ -183,7 +198,7 @@ rg4.metric("Lower Liq Wall", "$61,582")
 # ==========================================
 # SECTION 4: TELEMETRY & CHARTS
 # ==========================================
-st.markdown("<h4 style='border-bottom: 1px solid #444; padding-bottom: 8px; color: #E0E0E0; margin-top: 30px; text-transform: uppercase;'>🔬 Telemetry & Liquidity</h4>", unsafe_allow_html=True)
+render_header("🔬 Telemetry & Liquidity")
 
 if not telemetry:
     st.error("⚠️ Backend API is currently unreachable. Retrying in 30 seconds...")
@@ -247,3 +262,26 @@ else:
     with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
     with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power")
     with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
+
+# ==========================================
+# SECTION 5: QUANTITATIVE DESK SYNTHESIS
+# ==========================================
+if insights:
+    render_header("📝 Quantitative Desk Synthesis")
+    
+    syn_col1, syn_col2 = st.columns([2, 1.5])
+    
+    with syn_col1:
+        st.markdown(f"**🧠 Liquidity Thesis**\n> {insights.get('liquidity_thesis', 'N/A')}")
+        st.markdown(f"**🛡️ Institutional Guidance**\n> {insights.get('institutional_guidance', 'N/A')}")
+        
+    with syn_col2:
+        st.markdown("**📊 Volume Profile**")
+        vp = insights.get("volume_profile", {})
+        st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
+        st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
+        st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
+        
+        st.markdown("**⚠️ Upcoming Catalysts**")
+        for cat in insights.get("catalysts", []):
+            st.write(f"- {cat}")
