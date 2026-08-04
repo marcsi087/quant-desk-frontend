@@ -39,21 +39,32 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Corrected Trade Manager: Independent Ideas & 50x Manual Cap
     st.markdown("### 💼 Active Trade Manager")
-    st.warning("⚠️ RISK OVERRIDE: Active Short")
-    leverage = st.slider("Manual Leverage", min_value=1.0, max_value=25.0, value=12.5, step=0.5)
-    st.caption("System Rec Max Cap: 10.0x")
     
-    st.markdown("---")
+    st.markdown("**Macro Position (2-6 Wks)**")
+    st.success("🟢 Active Long (Bull Expansion)")
+    macro_lev = st.slider("Macro Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, help="System Max Cap: 10.0x")
     
-    st.markdown("### 🔄 API Connection")
-    if st.button("Force Telemetry Sync"):
-        get_telemetry.clear()
-        st.rerun()
+    st.markdown("**Swing Position (4-24 Hrs)**")
+    st.error("🔴 Active Short (Liquidation Wave)")
+    swing_lev = st.slider("Swing Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, help="System Max Cap: 10.0x")
+    
+    st.caption("✅ Independent Trade Ideas Enforced")
+    st.caption("⚠️ System Rec Max Cap: 10.0x")
 
 # --- HEADER & GLOBAL OVERVIEW ---
-st.title("⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
-st.caption("Institutional Decision Matrix & Execution Gateway")
+header_col1, header_col2 = st.columns([5, 1])
+with header_col1:
+    st.title("⚡ QUANT DESK MULTI-TIMEFRAME TERMINAL")
+    st.caption("Institutional Decision Matrix & Execution Gateway")
+with header_col2:
+    # Settings Dropdown at the Top Right
+    with st.popover("⚙️ Settings"):
+        st.markdown("**API Connection**")
+        if st.button("🔄 Force Telemetry Sync"):
+            get_telemetry.clear()
+            st.rerun()
 
 st.markdown("## 📊 Live Market Overview")
 m1, m2, m3, m4, m5 = st.columns(5)
@@ -176,13 +187,12 @@ else:
             
     st.markdown("---")
     
-    # 3. ON-CHAIN MACRO FLOWS (Color Logic Fixed)
+    # 3. ON-CHAIN MACRO FLOWS
     st.markdown("### ⛓️ On-Chain Exchange Flows")
     oc_data = telemetry.get("onchain_flows", {})
     oc1, oc2, oc3 = st.columns(3)
     
     with oc1:
-        # delta_color defaults to "normal", rendering positive strings as green
         st.metric("24H BTC Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
     with oc2:
         st.metric("24H Stablecoin Mint Velocity", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power Expansion")
