@@ -40,43 +40,56 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Fully Functional Trade Manager with Live PnL
+    # Fully Functional Trade Manager with Selection Toggles
     st.markdown("### 💼 Active Trade Manager")
     
-    # 1. MACRO LONG POSITION
-    with st.expander("🟢 MACRO: Active Long", expanded=True):
-        st.caption("Multi-Week Bull Expansion")
-        macro_entry = st.number_input("Entry Price ($)", value=63177.84, step=10.0, key="m_entry")
-        macro_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="m_col")
-        macro_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="m_lev")
+    # Toggles to select which trades to track
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        track_macro = st.toggle("🟢 Macro", value=True)
+    with col_t2:
+        track_swing = st.toggle("🔴 Swing", value=True)
         
-        # PnL Math (Long)
-        if macro_entry > 0:
-            macro_roi = ((LIVE_SPOT_PRICE - macro_entry) / macro_entry) * macro_lev * 100
-            macro_pnl = (macro_roi / 100) * macro_collat
-            pnl_color = "#00FF00" if macro_pnl >= 0 else "#FF4B4B"
-            pnl_sign = "+" if macro_pnl >= 0 else ""
+    st.markdown("---")
+    
+    if not track_macro and not track_swing:
+        st.info("No active trades selected for tracking.")
+
+    # 1. MACRO LONG POSITION
+    if track_macro:
+        with st.expander("🟢 MACRO: Active Long", expanded=True):
+            st.caption("Multi-Week Bull Expansion")
+            macro_entry = st.number_input("Entry Price ($)", value=63177.84, step=10.0, key="m_entry")
+            macro_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="m_col")
+            macro_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="m_lev")
             
-            st.markdown("**Live PnL:**")
-            st.markdown(f"<h3 style='color:{pnl_color}; margin-top:-15px;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h3>", unsafe_allow_html=True)
+            # PnL Math (Long)
+            if macro_entry > 0:
+                macro_roi = ((LIVE_SPOT_PRICE - macro_entry) / macro_entry) * macro_lev * 100
+                macro_pnl = (macro_roi / 100) * macro_collat
+                pnl_color = "#00FF00" if macro_pnl >= 0 else "#FF4B4B"
+                pnl_sign = "+" if macro_pnl >= 0 else ""
+                
+                st.markdown("**Live PnL:**")
+                st.markdown(f"<h3 style='color:{pnl_color}; margin-top:-15px;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h3>", unsafe_allow_html=True)
 
     # 2. SWING SHORT POSITION
-    with st.expander("🔴 SWING: Active Short", expanded=True):
-        st.caption("Tactical Liquidation Wave")
-        swing_entry = st.number_input("Entry Price ($)", value=63496.92, step=10.0, key="s_entry")
-        swing_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="s_col")
-        swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, key="s_lev")
-        
-        # PnL Math (Short)
-        if swing_entry > 0:
-            swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
-            swing_pnl = (swing_roi / 100) * swing_collat
-            pnl_color_s = "#00FF00" if swing_pnl >= 0 else "#FF4B4B"
-            pnl_sign_s = "+" if swing_pnl >= 0 else ""
+    if track_swing:
+        with st.expander("🔴 SWING: Active Short", expanded=True):
+            st.caption("Tactical Liquidation Wave")
+            swing_entry = st.number_input("Entry Price ($)", value=63496.92, step=10.0, key="s_entry")
+            swing_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="s_col")
+            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=12.5, step=0.5, key="s_lev")
             
-            st.markdown("**Live PnL:**")
-            st.markdown(f"<h3 style='color:{pnl_color_s}; margin-top:-15px;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h3>", unsafe_allow_html=True)
-
+            # PnL Math (Short)
+            if swing_entry > 0:
+                swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
+                swing_pnl = (swing_roi / 100) * swing_collat
+                pnl_color_s = "#00FF00" if swing_pnl >= 0 else "#FF4B4B"
+                pnl_sign_s = "+" if swing_pnl >= 0 else ""
+                
+                st.markdown("**Live PnL:**")
+                st.markdown(f"<h3 style='color:{pnl_color_s}; margin-top:-15px;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h3>", unsafe_allow_html=True)
 
 # --- HEADER & GLOBAL OVERVIEW ---
 header_col1, header_col2 = st.columns([5, 1])
