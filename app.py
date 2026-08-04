@@ -5,7 +5,8 @@ import plotly.graph_objects as go
 import requests
 
 # --- CONFIGURATION ---
-API_URL = "https://quant-desk-backend.onrender.com/api/v1"
+# Pointing specifically to your Render backend
+API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
 
 st.set_page_config(
     page_title="Quant Desk Multi-Timeframe Terminal",
@@ -15,11 +16,11 @@ st.set_page_config(
 )
 
 # --- DATA FETCHING (TALKING TO YOUR BACKEND) ---
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=20)
 def get_telemetry():
     """Fetches all data from your Render backend API."""
     try:
-        response = requests.get(f"{API_URL}/telemetry", timeout=5)
+        response = requests.get(f"{API_URL}/telemetry", timeout=10)
         if response.status_code == 200:
             return response.json()
     except:
@@ -81,7 +82,7 @@ st.markdown("---")
 st.markdown("## 🔬 INSTITUTIONAL DESK TELEMETRY & LIQUIDITY")
 
 if not telemetry:
-    st.error("⚠️ Backend API is currently unreachable or booting up. Please wait...")
+    st.error("⚠️ Backend API is currently unreachable or booting up. Please wait 30 seconds and refresh the page...")
 else:
     # 1. MARKET SESSION VOLUME & OPEN INFLOW
     st.markdown("### 🕒 Market Session Volume & Open Inflow")
