@@ -61,15 +61,48 @@ setups = telemetry.get("trade_setups", {})
 plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
 
-# --- EXECUTION GATE LOGIC ---
-if macro_score >= 6.0 and swing_score >= 60.0 and micro_score >= 60.0:
+# --- TIERED EXECUTION GATE LOGIC ---
+# Define the baseline regime (Assuming > 5.0 is Bullish, < 5.0 is Bearish)
+macro_bull = macro_score >= 5.0
+
+# Tier 1: Perfect Alignment (Trend + Momentum)
+if macro_bull and swing_score >= 55.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif macro_score <= 4.0 and swing_score <= 45.0 and micro_score <= 40.0:
+elif not macro_bull and swing_score <= 45.0 and micro_score <= 45.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
-elif (macro_score >= 6.0 and swing_score <= 45.0) or (macro_score <= 4.0 and swing_score >= 60.0):
-    exec_gate = "🟡 HEDGE REQUIRED"
+
+# Tier 2: Aggressive Tactical (Trading against the Macro trend on momentum)
+elif macro_bull and swing_score <= 45.0 and micro_score <= 45.0:
+    exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
+elif not macro_bull and swing_score >= 55.0 and micro_score >= 50.0:
+    exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
+
+# Tier 3: Choppy / Mixed Signals
 else:
-    exec_gate = "⏳ STAND DOWN"
+    exec_gate = "⏳ SCALP ONLY / STAND DOWN"
+
+# --- DYNAMIC KELLY CRITERION ---
+# W = Win Rate (Proxied by Tactical Score)
+W = swing_score / 100.0
+
+# R = Reward/Risk Ratio (Derived from Tactical Setups)
+s_setups = setups.get("tactical", {})
+s_entry = s_setups.get('entry', LIVE_SPOT_PRICE)
+s_t2 = s_setups.get('t2', 62800.00)
+s_sl = s_setups.get('sl', 65411.00)
+
+reward = abs(s_entry - s_t2)
+risk = abs(s_entry - s_sl)
+
+if risk > 0:
+    R = reward / risk
+    # Kelly Formula: K = W - ((1 - W) / R)
+    kelly_fraction = W - ((1 - W) / R)
+    quarter_kelly = max(0.0, (kelly_fraction / 4) * 100)
+else:
+    quarter_kelly = 0.0
+
+kelly_display = f"{quarter_kelly:.2f}%"
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
