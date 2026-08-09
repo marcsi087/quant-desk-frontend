@@ -60,24 +60,21 @@ insights = telemetry.get("insights", {})
 # --- TIERED EXECUTION GATE LOGIC ---
 macro_bull = macro_score >= 5.0
 
-# Tier 1: Perfect Alignment (Trend + Momentum)
 if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
 elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
-
-# Tier 2: Aggressive Tactical (Trading against the Macro trend on momentum)
 elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
 elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
-
-# Tier 3: Choppy / Mixed Signals
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
 
 # --- DYNAMIC KELLY CRITERION ---
-W = swing_score / 100.0
+# If score is bearish (< 50), invert the win probability for a Short
+W = (swing_score / 100.0) if swing_score >= 50.0 else ((100.0 - swing_score) / 100.0)
+
 s_setups = setups.get("tactical", {})
 s_entry = s_setups.get('entry', LIVE_SPOT_PRICE)
 s_t2 = s_setups.get('t2', 62800.00)
@@ -162,9 +159,6 @@ if FUNDING_RATE < 0:
 else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
-# ==========================================
-# HELPER FUNCTION FOR CLEAN HEADERS
-# ==========================================
 def render_header(title):
     st.markdown(f"""
     <h4 style='
@@ -258,25 +252,6 @@ with col_micro:
     mi_t2 = mi_setups.get('t2', 65411.00)
     mi_sl = mi_setups.get('sl', 63600.00)
 
-    # --- SYMMETRICAL DIRECTIONAL INVERSION PATCH ---
-    if micro_score <= 48.0 and mi_t1 > LIVE_SPOT_PRICE: # Short Fix
-        delta_t1 = mi_t1 - LIVE_SPOT_PRICE
-        delta_t2 = mi_t2 - LIVE_SPOT_PRICE
-        delta_sl = LIVE_SPOT_PRICE - mi_sl
-        
-        mi_t1 = LIVE_SPOT_PRICE - delta_t1
-        mi_t2 = LIVE_SPOT_PRICE - delta_t2
-        mi_sl = LIVE_SPOT_PRICE + delta_sl
-        
-    elif micro_score >= 50.0 and mi_t1 < LIVE_SPOT_PRICE: # Long Fix
-        delta_t1 = LIVE_SPOT_PRICE - mi_t1
-        delta_t2 = LIVE_SPOT_PRICE - mi_t2
-        delta_sl = mi_sl - LIVE_SPOT_PRICE
-        
-        mi_t1 = LIVE_SPOT_PRICE + delta_t1
-        mi_t2 = LIVE_SPOT_PRICE + delta_t2
-        mi_sl = LIVE_SPOT_PRICE - delta_sl
-
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
@@ -293,7 +268,6 @@ with col_micro:
 if insights or telemetry:
     render_header("📜 Playbook Manifesto")
     
-    # --- COLOR MATCH THE DIRECTIVE BIAS ---
     if "🟢" in exec_gate:
         playbook_color = st.success
     elif "🔴" in exec_gate:
@@ -303,7 +277,6 @@ if insights or telemetry:
     else:
         playbook_color = st.info
         
-    # Dynamically generate the CVD thesis based on live session data
     ny_cvd_str = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
     vwap = ta.get("vwap", LIVE_SPOT_PRICE)
     
@@ -311,7 +284,6 @@ if insights or telemetry:
         is_buying = "+" in ny_cvd_str
         below_vwap = LIVE_SPOT_PRICE < vwap
         
-        # Escape dollar signs so Streamlit doesn't interpret them as LaTeX math blocks
         safe_cvd = ny_cvd_str.replace('$', '\\$')
         
         if is_buying and below_vwap:
