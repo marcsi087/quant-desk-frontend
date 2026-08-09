@@ -456,7 +456,7 @@ if insights:
             
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
-        action_plan_clean = insights.get("action_plan", "Execute scaling limits only at structural value nodes.").replace('$', '\\$')
+        action_plan_clean = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
         
         if "TRAP" in action_plan_clean:
             st.error(action_plan_clean)
