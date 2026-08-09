@@ -77,10 +77,7 @@ else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
 
 # --- DYNAMIC KELLY CRITERION ---
-# W = Win Rate (Proxied by Tactical Score)
 W = swing_score / 100.0
-
-# R = Reward/Risk Ratio (Derived from Tactical Setups)
 s_setups = setups.get("tactical", {})
 s_entry = s_setups.get('entry', LIVE_SPOT_PRICE)
 s_t2 = s_setups.get('t2', 62800.00)
@@ -91,7 +88,6 @@ risk = abs(s_entry - s_sl)
 
 if risk > 0:
     R = reward / risk
-    # Kelly Formula: K = W - ((1 - W) / R)
     kelly_fraction = W - ((1 - W) / R)
     quarter_kelly = max(0.0, (kelly_fraction / 4) * 100)
 else:
@@ -210,6 +206,21 @@ with col_macro:
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
 
+    ma_setups = setups.get("macro", {})
+    ma_t1 = ma_setups.get('t1', 70000.00)
+    ma_t2 = ma_setups.get('t2', 74000.00)
+    ma_sl = ma_setups.get('sl', 58000.00)
+
+    st.markdown(f"""
+    | Parameter | Target / Level |
+    | :--- | :--- |
+    | **Macro Score** | `{macro_score} / 10` |
+    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+    | **Conservative T1** | `${ma_t1:,.2f}` |
+    | **Aggressive T2** | `${ma_t2:,.2f}` |
+    | **Stop Loss (SL)** | `${ma_sl:,.2f}` |
+    """)
+
 with col_swing:
     st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
     if swing_score >= 52.0:
@@ -218,6 +229,21 @@ with col_swing:
         st.error("Directive: TACTICAL LIQUIDATION WAVE")
     else:
         st.warning("Directive: ⏳ CHOP / NO TRADE")
+
+    sw_setups = setups.get("tactical", {})
+    sw_t1 = sw_setups.get('t1', 63500.00)
+    sw_t2 = sw_setups.get('t2', 62800.00)
+    sw_sl = sw_setups.get('sl', 65411.00)
+
+    st.markdown(f"""
+    | Parameter | Target / Level |
+    | :--- | :--- |
+    | **Swing Score** | `{swing_score} / 100` |
+    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+    | **Conservative T1** | `${sw_t1:,.2f}` |
+    | **Aggressive T2** | `${sw_t2:,.2f}` |
+    | **Stop Loss (SL)** | `${sw_sl:,.2f}` |
+    """)
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
@@ -228,7 +254,6 @@ with col_micro:
     else:
         st.warning("Directive: ⏳ NEUTRAL / CHOP")
 
-    # FETCH MICRO SETUPS BEFORE USING THEM IN PATCH
     mi_setups = setups.get("micro", {})
     mi_t1 = mi_setups.get('t1', 65000.00)
     mi_t2 = mi_setups.get('t2', 65411.00)
@@ -253,7 +278,6 @@ with col_micro:
         mi_t2 = LIVE_SPOT_PRICE + delta_t2
         mi_sl = LIVE_SPOT_PRICE - delta_sl
 
-    # RE-RENDER THE MICRO TABLE
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
@@ -285,9 +309,7 @@ if insights:
 render_header("🛡️ Desk-Level Risk Gateway")
 rg1, rg2, rg3, rg4 = st.columns(4)
 
-# Strip emojis from the exec_gate string for a cleaner desk directive
 clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
-
 hm_data = telemetry.get("orderbook_heatmap", {})
 upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
