@@ -54,7 +54,7 @@ swing_score = scores.get("swing", 42.0)
 micro_score = scores.get("micro", 50.0)
 
 setups = telemetry.get("trade_setups", {})
-plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
+plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%", "vix": "14.50", "sp500": "5,200"})
 insights = telemetry.get("insights", {})
 
 # --- TIERED EXECUTION GATE LOGIC ---
@@ -96,9 +96,17 @@ with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
     
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
-    st.metric("DXY Index", plumbing.get("dxy", "99.80"), "-0.15")
-    st.metric("US 10Y Yield", plumbing.get("us10y", "4.74%"), "+0.02")
-    st.caption("Expanding Macro Liquidity Proxy")
+    
+    # New 2x2 Grid for Macro Data
+    pl1, pl2 = st.columns(2)
+    with pl1:
+        st.metric("DXY Index", plumbing.get("dxy", "99.80"))
+        st.metric("S&P 500", plumbing.get("sp500", "5,200"))
+    with pl2:
+        st.metric("US 10Y", plumbing.get("us10y", "4.74%"))
+        st.metric("VIX", plumbing.get("vix", "14.50"))
+        
+    st.caption("Macro Liquidity & Risk Proxies")
     
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
     
@@ -125,7 +133,8 @@ with st.sidebar:
                 macro_pnl = (macro_roi / 100) * macro_collat
                 pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
                 pnl_sign = "+" if macro_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}\\${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                # Using &#36; to prevent LaTeX corruption inside HTML
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}&#36;{macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
@@ -138,7 +147,8 @@ with st.sidebar:
                 swing_pnl = (swing_roi / 100) * swing_collat
                 pnl_color_s = "#00E676" if swing_pnl >= 0 else "#FF3366"
                 pnl_sign_s = "+" if swing_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}\\${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                # Using &#36; to prevent LaTeX corruption inside HTML
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}&#36;{swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
 # --- HEADER & OVERVIEW ---
 header_col1, header_col2 = st.columns([5, 1])
