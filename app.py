@@ -46,7 +46,7 @@ LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
 OPEN_INTEREST = telemetry.get("open_interest", "$7.02B")
-ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00, "atr_pct": 0.01})
+ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00})
 scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
 
 macro_score = scores.get("macro", 6.2)
@@ -57,22 +57,16 @@ setups = telemetry.get("trade_setups", {})
 plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
 
-# --- TIERED EXECUTION GATE LOGIC (REGIME FILTERED) ---
-macro_bull = macro_score >= 5.5
-macro_bear = macro_score <= 4.5
+# --- TIERED EXECUTION GATE LOGIC ---
+macro_bull = macro_score >= 5.0
 
-# Detect violent structural divergences to protect capital
-if macro_bull and micro_score <= 45.0:
-    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐂 / MICRO 🐻)"
-elif macro_bear and micro_score >= 55.0:
-    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐻 / MICRO 🐂)"
-elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0:
+elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
 elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
-elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
+elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
@@ -158,9 +152,17 @@ with header_col2:
             get_telemetry.clear()
             st.rerun()
 
-# --- DYNAMIC RISK BANNER ---
+# --- DYNAMIC SQUEEZE RISK BANNER ---
+hm_data = telemetry.get("orderbook_heatmap", {})
+upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
+ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
+
 if FUNDING_RATE < 0:
-    st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative CVD paired with massive liquidity above \\$65.4k.")
+    st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.")
+elif FUNDING_RATE_PCT > 0.015:
+    st.warning(f"⚠️ **SYSTEM ALERT: LONG DELEVERAGING RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | High perp premium; late longs susceptible to liquidation.")
+elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
+    st.warning(f"⚠️ **SYSTEM ALERT: ABSORPTION / SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.")
 else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
@@ -218,7 +220,8 @@ with col_macro:
     | **Aggressive T2** | `${ma_t2:,.2f}` |
     | **Stop Loss (SL)** | `${ma_sl:,.2f}` |
     """)
-    st.caption(f"**Rationale:** {insights.get('rationales', {}).get('macro', 'Awaiting live data...')}")
+    macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...').replace('$', '\\$')
+    st.caption(f"**Rationale:** {macro_rat}")
 
 with col_swing:
     st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
@@ -243,7 +246,8 @@ with col_swing:
     | **Aggressive T2** | `${sw_t2:,.2f}` |
     | **Stop Loss (SL)** | `${sw_sl:,.2f}` |
     """)
-    st.caption(f"**Rationale:** {insights.get('rationales', {}).get('swing', 'Awaiting live data...')}")
+    swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...').replace('$', '\\$')
+    st.caption(f"**Rationale:** {swing_rat}")
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
@@ -268,10 +272,11 @@ with col_micro:
     | **Aggressive T2** | `${mi_t2:,.2f}` |
     | **Stop Loss (SL)** | `${mi_sl:,.2f}` |
     """)
-    st.caption(f"**Rationale:** {insights.get('rationales', {}).get('micro', 'Awaiting live data...')}")
+    micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...').replace('$', '\\$')
+    st.caption(f"**Rationale:** {micro_rat}")
 
 # ==========================================
-# SECTION 3: PLAYBOOK MANIFESTO (DYNAMIC OVERRIDE)
+# SECTION 3: PLAYBOOK MANIFESTO
 # ==========================================
 if insights or telemetry:
     render_header("📜 Playbook Manifesto")
@@ -280,19 +285,17 @@ if insights or telemetry:
         playbook_color = st.success
     elif "🔴" in exec_gate:
         playbook_color = st.error
-    elif "⚠️" in exec_gate or "🟡" in exec_gate:
+    elif "🟡" in exec_gate:
         playbook_color = st.warning
     else:
         playbook_color = st.info
         
-    ny_cvd_str = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
     vwap = ta.get("vwap", LIVE_SPOT_PRICE)
     
-    if ny_cvd_str:
-        is_buying = "+" in ny_cvd_str
+    if ny_cvd_raw:
+        is_buying = "+" in ny_cvd_raw
         below_vwap = LIVE_SPOT_PRICE < vwap
-        
-        safe_cvd = ny_cvd_str.replace('$', '\\$')
+        safe_cvd = ny_cvd_raw.replace('$', '\\$')
         
         if is_buying and below_vwap:
             dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({safe_cvd}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (\\${vwap:,.2f})."
@@ -316,14 +319,7 @@ if insights or telemetry:
 render_header("🛡️ Desk-Level Risk Gateway")
 rg1, rg2, rg3, rg4 = st.columns(4)
 
-# Safely split to remove the emoji for a cleaner text display, supporting the new Trap emoji
-if "⚠️" in exec_gate:
-    clean_directive = exec_gate.split(" ", 1)[1]
-else:
-    clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
-
-hm_data = telemetry.get("orderbook_heatmap", {})
-upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
+clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 
 rg1.metric("Risk Base Score", f"{swing_score} / 100")
@@ -408,23 +404,19 @@ if insights:
     with vp_col:
         st.markdown("**📊 Volume Profile**")
         vp = insights.get("volume_profile", {})
-        st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
-        st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
-        st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
+        poc_clean = vp.get('poc', 'N/A').replace('$', '\\$')
+        vah_clean = vp.get('vah', 'N/A').replace('$', '\\$')
+        val_clean = vp.get('val', 'N/A').replace('$', '\\$')
+        st.write(f"- **Point of Control (POC):** {poc_clean}")
+        st.write(f"- **Value Area High (VAH):** {vah_clean}")
+        st.write(f"- **Value Area Low (VAL):** {val_clean}")
         
     with cat_col:
         st.markdown("**⚠️ Upcoming Catalysts & Filters**")
         for cat in insights.get("catalysts", []):
-            st.write(f"- {cat}")
+            st.write(f"- {cat.replace('$', '\\$')}")
             
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
-        action_plan = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
-        
-        # Color match the action plan box to the severity of the guidance
-        if "TRAP" in action_plan:
-            st.error(action_plan)
-        elif "favorable" in action_plan:
-            st.success(action_plan)
-        else:
-            st.warning(action_plan)
+        action_plan_clean = insights.get("action_plan", "Execute scaling limits only at structural value nodes.").replace('$', '\\$')
+        st.info(action_plan_clean)
