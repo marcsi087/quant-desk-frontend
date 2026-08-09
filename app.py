@@ -159,7 +159,7 @@ with header_col2:
 
 # --- DYNAMIC RISK BANNER ---
 if FUNDING_RATE < 0:
-    st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative CVD paired with massive liquidity above $65.4k.")
+    st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative CVD paired with massive liquidity above \\$65.4k.")
 else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
@@ -308,18 +308,23 @@ if insights or telemetry:
         is_buying = "+" in ny_cvd_str
         below_vwap = LIVE_SPOT_PRICE < vwap
         
+        # Escape dollar signs so Streamlit doesn't interpret them as LaTeX math blocks
+        safe_cvd = ny_cvd_str.replace('$', '\\$')
+        
         if is_buying and below_vwap:
-            dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({ny_cvd_str}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (${vwap:,.2f})."
+            dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({safe_cvd}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (\\${vwap:,.2f})."
         elif not is_buying and not below_vwap:
-            dynamic_thesis = f"Negative CVD Divergence: Aggressive NY market sells ({ny_cvd_str}) are being absorbed by passive limit buyers. Sellers are trapped above VWAP (${vwap:,.2f})."
+            dynamic_thesis = f"Negative CVD Divergence: Aggressive NY market sells ({safe_cvd}) are being absorbed by passive limit buyers. Sellers are trapped above VWAP (\\${vwap:,.2f})."
         elif is_buying and not below_vwap:
-            dynamic_thesis = f"Trend Alignment: Aggressive NY market buying ({ny_cvd_str}) is driving price expansion above VWAP."
+            dynamic_thesis = f"Trend Alignment: Aggressive NY market buying ({safe_cvd}) is driving price expansion above VWAP."
         else:
-            dynamic_thesis = f"Trend Alignment: Aggressive NY market selling ({ny_cvd_str}) is forcing price depreciation below VWAP."
+            dynamic_thesis = f"Trend Alignment: Aggressive NY market selling ({safe_cvd}) is forcing price depreciation below VWAP."
     else:
-        dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
+        dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.').replace('$', '\\$')
 
-    playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {insights.get('institutional_guidance', 'N/A')}")
+    safe_guidance = insights.get('institutional_guidance', 'N/A').replace('$', '\\$')
+    
+    playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {safe_guidance}")
     playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
 
 # ==========================================
