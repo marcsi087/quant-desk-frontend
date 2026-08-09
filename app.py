@@ -192,7 +192,7 @@ m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
 m2.metric("1H RSI", f"{ta.get('rsi', 58.0)}")
 m3.metric("1H VWAP", f"${ta.get('vwap', 63888.0):,.2f}")
 m4.metric("Open Interest", OPEN_INTEREST)
-m5.metric("Kelly Limit", "2.5%")
+m5.metric("Kelly Limit", kelly_display) # <-- Updated to dynamic variable
 m6.metric("Execution Gate", exec_gate)
 
 # ==========================================
