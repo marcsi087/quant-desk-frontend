@@ -134,9 +134,9 @@ with st.sidebar:
 
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
-            swing_entry = st.number_input("Entry Price ($)", value=64260.00, step=10.0, key="s_entry")
-            swing_collat = st.number_input("Collateral ($)", value=319.00, step=100.0, key="s_col")
-            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=30.0, step=0.5, key="s_lev")
+            swing_entry = st.number_input("Entry Price ($)", value=63993.00, step=10.0, key="s_entry")
+            swing_collat = st.number_input("Collateral ($)", value=344.00, step=100.0, key="s_col")
+            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=15.0, step=0.5, key="s_lev")
             
             if swing_entry > 0:
                 swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
@@ -289,9 +289,9 @@ with col_micro:
     """)
 
 # ==========================================
-# SECTION 3: PLAYBOOK MANIFESTO
+# SECTION 3: PLAYBOOK MANIFESTO (DYNAMIC OVERRIDE)
 # ==========================================
-if insights:
+if insights or telemetry:
     render_header("📜 Playbook Manifesto")
     if macro_score >= 6.0:
         playbook_color = st.success
@@ -300,8 +300,27 @@ if insights:
     else:
         playbook_color = st.info
         
+    # Dynamically generate the CVD thesis based on live session data
+    ny_cvd_str = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
+    vwap = ta.get("vwap", LIVE_SPOT_PRICE)
+    
+    if ny_cvd_str:
+        is_buying = "+" in ny_cvd_str
+        below_vwap = LIVE_SPOT_PRICE < vwap
+        
+        if is_buying and below_vwap:
+            dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({ny_cvd_str}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (${vwap:,.2f})."
+        elif not is_buying and not below_vwap:
+            dynamic_thesis = f"Negative CVD Divergence: Aggressive NY market sells ({ny_cvd_str}) are being absorbed by passive limit buyers. Sellers are trapped above VWAP (${vwap:,.2f})."
+        elif is_buying and not below_vwap:
+            dynamic_thesis = f"Trend Alignment: Aggressive NY market buying ({ny_cvd_str}) is driving price expansion above VWAP."
+        else:
+            dynamic_thesis = f"Trend Alignment: Aggressive NY market selling ({ny_cvd_str}) is forcing price depreciation below VWAP."
+    else:
+        dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
+
     playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {insights.get('institutional_guidance', 'N/A')}")
-    playbook_color(f"**🧠 LIQUIDITY THESIS:** {insights.get('liquidity_thesis', 'N/A')}")
+    playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
 
 # ==========================================
 # SECTION 4: RISK GATEWAY
