@@ -281,12 +281,16 @@ with col_swing:
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-    if micro_score >= 50.0:
-        st.success("Directive: 🟢 AGGRESSIVE LONG")
-    elif micro_score <= 48.0:
-        st.error("Directive: 🔴 AGGRESSIVE SHORT")
+# Pull the dynamically calculated directive from the backend
+    micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
+    
+    # Render the correct UI color based on the backend directive
+    if "🟢" in micro_dir:
+        st.success(f"Directive: {micro_dir}")
+    elif "🔴" in micro_dir:
+        st.error(f"Directive: {micro_dir}")
     else:
-        st.warning("Directive: ⏳ NEUTRAL / CHOP")
+        st.warning(f"Directive: {micro_dir}")
 
     mi_setups = setups.get("micro", {})
     mi_t1 = mi_setups.get('t1', 65000.00)
