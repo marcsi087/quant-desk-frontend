@@ -202,78 +202,48 @@ col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
     st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
-    if macro_score >= 6.0:
-        st.success("Directive: LONG (🐂 BULL EXPANSION)")
-    elif macro_score <= 4.0:
-        st.error("Directive: SHORT (🐻 BEAR CONTRACTION)")
-    else:
-        st.warning("Directive: ⏳ NEUTRAL / CHOP")
-        
-    m_setups = setups.get("macro", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Macro Score** | `{macro_score} / 10` |
-    | **Entry Zone** | `${m_setups.get('entry', 63177):,.2f}` |
-    | **Conservative T1** | `${m_setups.get('t1', 66000):,.2f}` |
-    | **Aggressive T2** | `${m_setups.get('t2', 68200):,.2f}` |
-    | **Stop Loss (SL)** | `${m_setups.get('sl', 62400):,.2f}` |
-    """)
+   # MACRO UPDATE
+if macro_score >= 5.5:
+    st.success("Directive: LONG (🐂 BULL EXPANSION)")
+elif macro_score <= 4.5:
+    st.error("Directive: SHORT (🐻 BEAR CONTRACTION)")
+else:
+    st.warning("Directive: ⏳ NEUTRAL / CHOP")
 
-with col_swing:
-    st.markdown("**⚡ 2. TACTICAL SWING (4-24 HRS)**")
-    if swing_score >= 60.0:
-        st.success("Directive: TACTICAL LONG RALLY")
-    elif swing_score <= 45.0:
-        st.error("Directive: TACTICAL LIQUIDATION WAVE")
-    else:
-        st.warning("Directive: ⏳ CHOP / NO TRADE")
-        
-    s_setups = setups.get("tactical", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Tactical Score** | `{swing_score} / 100` |
-    | **Entry Zone** | `${s_setups.get('entry', LIVE_SPOT_PRICE):,.2f}` |
-    | **Conservative T1** | `${s_setups.get('t1', 63850):,.2f}` |
-    | **Aggressive T2** | `${s_setups.get('t2', 62800):,.2f}` |
-    | **Stop Loss (SL)** | `${s_setups.get('sl', 65411):,.2f}` |
-    """)
+# SWING UPDATE
+if swing_score >= 52.0:
+    st.success("Directive: TACTICAL LONG RALLY")
+elif swing_score <= 48.0:
+    st.error("Directive: TACTICAL LIQUIDATION WAVE")
+else:
+    st.warning("Directive: ⏳ CHOP / NO TRADE")
 
-with col_micro:
-        st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-        if micro_score >= 60.0:
-            st.success("Directive: 🟢 AGGRESSIVE LONG")
-        elif micro_score <= 40.0:
-            st.error("Directive: 🔴 AGGRESSIVE SHORT")
-        else:
-            st.warning("Directive: ⏳ NEUTRAL / CHOP")
-        
-        mi_setups = setups.get("micro", {})
-        mi_t1 = mi_setups.get('t1', 65000.00)
-        mi_t2 = mi_setups.get('t2', 65411.00)
-        mi_sl = mi_setups.get('sl', 63600.00)
-        
-        # --- DIRECTIONAL INVERSION PATCH ---
-        # If score indicates a short, but T1 is plotted above the live spot, invert the matrix
-        if micro_score <= 40.0 and mi_t1 > LIVE_SPOT_PRICE:
-            delta_t1 = mi_t1 - LIVE_SPOT_PRICE
-            delta_t2 = mi_t2 - LIVE_SPOT_PRICE
-            delta_sl = LIVE_SPOT_PRICE - mi_sl
-            
-            mi_t1 = LIVE_SPOT_PRICE - delta_t1
-            mi_t2 = LIVE_SPOT_PRICE - delta_t2
-            mi_sl = LIVE_SPOT_PRICE + delta_sl
-            
-        st.markdown(f"""
-        | Parameter | Target / Level |
-        | :--- | :--- |
-        | **Micro Score** | `{micro_score} / 100` |
-        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-        | **Conservative T1** | `${mi_t1:,.2f}` |
-        | **Aggressive T2** | `${mi_t2:,.2f}` |
-        | **Stop Loss (SL)** | `${mi_sl:,.2f}` |
-        """)
+# MICRO UPDATE (With Symmetrical Patch)
+if micro_score >= 50.0:
+    st.success("Directive: 🟢 AGGRESSIVE LONG")
+elif micro_score <= 48.0:
+    st.error("Directive: 🔴 AGGRESSIVE SHORT")
+else:
+    st.warning("Directive: ⏳ NEUTRAL / CHOP")
+
+# --- SYMMETRICAL DIRECTIONAL INVERSION PATCH ---
+if micro_score <= 48.0 and mi_t1 > LIVE_SPOT_PRICE: # Short Fix
+    delta_t1 = mi_t1 - LIVE_SPOT_PRICE
+    delta_t2 = mi_t2 - LIVE_SPOT_PRICE
+    delta_sl = LIVE_SPOT_PRICE - mi_sl
+    
+    mi_t1 = LIVE_SPOT_PRICE - delta_t1
+    mi_t2 = LIVE_SPOT_PRICE - delta_t2
+    mi_sl = LIVE_SPOT_PRICE + delta_sl
+    
+elif micro_score >= 50.0 and mi_t1 < LIVE_SPOT_PRICE: # Long Fix
+    delta_t1 = LIVE_SPOT_PRICE - mi_t1
+    delta_t2 = LIVE_SPOT_PRICE - mi_t2
+    delta_sl = mi_sl - LIVE_SPOT_PRICE
+    
+    mi_t1 = LIVE_SPOT_PRICE + delta_t1
+    mi_t2 = LIVE_SPOT_PRICE + delta_t2
+    mi_sl = LIVE_SPOT_PRICE - delta_sl
 
 # ==========================================
 # SECTION 3: PLAYBOOK MANIFESTO
