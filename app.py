@@ -60,14 +60,19 @@ insights = telemetry.get("insights", {})
 # --- TIERED EXECUTION GATE LOGIC ---
 macro_bull = macro_score >= 5.0
 
+# Tier 1: Perfect Alignment (Trend + Momentum)
 if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
 elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
+
+# Tier 2: Aggressive Tactical (Trading against the Macro trend on momentum)
 elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
 elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
+
+# Tier 3: Choppy / Mixed Signals
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
 
@@ -159,6 +164,9 @@ if FUNDING_RATE < 0:
 else:
     st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
 
+# ==========================================
+# HELPER FUNCTION FOR CLEAN HEADERS
+# ==========================================
 def render_header(title):
     st.markdown(f"""
     <h4 style='
@@ -252,6 +260,8 @@ with col_micro:
     mi_t2 = mi_setups.get('t2', 65411.00)
     mi_sl = mi_setups.get('sl', 63600.00)
 
+    # DEAD CODE REMOVED - Backend now dynamically inverts targets based on score.
+
     st.markdown(f"""
     | Parameter | Target / Level |
     | :--- | :--- |
@@ -268,6 +278,7 @@ with col_micro:
 if insights or telemetry:
     render_header("📜 Playbook Manifesto")
     
+    # --- COLOR MATCH THE DIRECTIVE BIAS ---
     if "🟢" in exec_gate:
         playbook_color = st.success
     elif "🔴" in exec_gate:
@@ -277,6 +288,7 @@ if insights or telemetry:
     else:
         playbook_color = st.info
         
+    # Dynamically generate the CVD thesis based on live session data
     ny_cvd_str = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
     vwap = ta.get("vwap", LIVE_SPOT_PRICE)
     
@@ -284,6 +296,7 @@ if insights or telemetry:
         is_buying = "+" in ny_cvd_str
         below_vwap = LIVE_SPOT_PRICE < vwap
         
+        # Escape dollar signs so Streamlit doesn't interpret them as LaTeX math blocks
         safe_cvd = ny_cvd_str.replace('$', '\\$')
         
         if is_buying and below_vwap:
@@ -359,51 +372,51 @@ else:
             fig_heatmap.add_hline(y=hm_data["lower_wall"], line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
 
-    with viz_col2:
-        st.markdown("**📉 Deribit Volatility Skew**")
-        vs_data = telemetry.get("volatility_skew", {})
-        if vs_data:
-            fig_skew = go.Figure()
-            fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
-            fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
-            fig_skew.update_layout(
-                height=400, margin=dict(l=0, r=0, t=20, b=0),
-                template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title=dict(text="Delta", font=dict(color="#8892B0")), autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
-                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
-            )
-            st.plotly_chart(fig_skew, use_container_width=True)
+        with viz_col2:
+            st.markdown("**📉 Deribit Volatility Skew**")
+            vs_data = telemetry.get("volatility_skew", {})
+            if vs_data:
+                fig_skew = go.Figure()
+                fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
+                fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
+                fig_skew.update_layout(
+                    height=400, margin=dict(l=0, r=0, t=20, b=0),
+                    template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    xaxis=dict(title=dict(text="Delta", font=dict(color="#8892B0")), autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
+                    yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
+                )
+                st.plotly_chart(fig_skew, use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**⛓️ On-Chain Exchange Flows**")
-    oc_data = telemetry.get("onchain_flows", {})
-    oc1, oc2, oc3 = st.columns(3)
-    with oc1:
-        st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
-    with oc2:
-        st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power")
-    with oc3:
-        st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("**⛓️ On-Chain Exchange Flows**")
+        oc_data = telemetry.get("onchain_flows", {})
+        oc1, oc2, oc3 = st.columns(3)
+        with oc1:
+            st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
+        with oc2:
+            st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power")
+        with oc3:
+            st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
 
-# ==========================================
-# SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
-# ==========================================
-if insights:
-    render_header("📝 Quantitative Market Data & Guidance")
-    vp_col, cat_col, guide_col = st.columns(3)
-    
-    with vp_col:
-        st.markdown("**📊 Volume Profile**")
-        vp = insights.get("volume_profile", {})
-        st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
-        st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
-        st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
+    # ==========================================
+    # SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
+    # ==========================================
+    if insights:
+        render_header("📝 Quantitative Market Data & Guidance")
+        vp_col, cat_col, guide_col = st.columns(3)
         
-    with cat_col:
-        st.markdown("**⚠️ Upcoming Catalysts**")
-        for cat in insights.get("catalysts", []):
-            st.write(f"- {cat}")
+        with vp_col:
+            st.markdown("**📊 Volume Profile**")
+            vp = insights.get("volume_profile", {})
+            st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
+            st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
+            st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
             
-    with guide_col:
-        st.markdown("**🧭 Desk-Level Action Plan**")
-        st.info("Execute scaling limits only at structural value nodes. Monitor funding rate bleed closely for squeeze continuation.")
+        with cat_col:
+            st.markdown("**⚠️ Upcoming Catalysts**")
+            for cat in insights.get("catalysts", []):
+                st.write(f"- {cat}")
+                
+        with guide_col:
+            st.markdown("**🧭 Desk-Level Action Plan**")
+            st.info("Execute scaling limits only at structural value nodes. Monitor funding rate bleed closely for squeeze continuation.")
