@@ -292,10 +292,18 @@ else:
     
     with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
-        if hm_data and "z_matrix" in hm_data:
+        
+        # Safely extract z_matrix and check that it contains valid data rows
+        z_matrix = hm_data.get("z_matrix", []) if hm_data else []
+        has_valid_data = len(z_matrix) > 0 and any(any(row) for row in z_matrix)
+
+        if hm_data and has_valid_data:
             fig_heatmap = go.Figure(data=go.Heatmap(
-                z=hm_data["z_matrix"], x=hm_data["time_steps"], y=hm_data["prices"],
-                colorscale='Turbo', showscale=True,
+                z=z_matrix, 
+                x=hm_data.get("time_steps", []), 
+                y=hm_data.get("prices", []),
+                colorscale='Turbo', 
+                showscale=True,
                 colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
             ))
             fig_heatmap.update_layout(
@@ -308,8 +316,7 @@ else:
             fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
         else:
-            st.info("Heatmap data currently syncing with backend...")
-
+            st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
     with viz_col2:
         st.markdown("**📉 Deribit Volatility Skew**")
         vs_data = telemetry.get("volatility_skew", {})
