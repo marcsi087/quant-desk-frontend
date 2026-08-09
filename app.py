@@ -62,25 +62,23 @@ plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
 
 # --- TIERED EXECUTION GATE LOGIC ---
-# Define the baseline regime (Assuming > 5.0 is Bullish, < 5.0 is Bearish)
 macro_bull = macro_score >= 5.0
 
 # Tier 1: Perfect Alignment (Trend + Momentum)
-if macro_bull and swing_score >= 55.0 and micro_score >= 50.0:
+if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif not macro_bull and swing_score <= 45.0 and micro_score <= 45.0:
+elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
 
 # Tier 2: Aggressive Tactical (Trading against the Macro trend on momentum)
-elif macro_bull and swing_score <= 45.0 and micro_score <= 45.0:
+elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
-elif not macro_bull and swing_score >= 55.0 and micro_score >= 50.0:
+elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
 
 # Tier 3: Choppy / Mixed Signals
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
-
 # --- DYNAMIC KELLY CRITERION ---
 # W = Win Rate (Proxied by Tactical Score)
 W = swing_score / 100.0
