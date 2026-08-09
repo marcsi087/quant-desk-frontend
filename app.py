@@ -326,12 +326,14 @@ else:
         vs_data = telemetry.get("volatility_skew", {})
         if vs_data:
             fig_skew = go.Figure()
-            fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
-            fig_skew.add_trace(go.Scatter(x=vs_data["deltas"], y=vs_data["iv_surface"], mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
+            # Note: X-axis now mapped to "strikes" instead of "deltas" for real data
+            x_data = vs_data.get("strikes", vs_data.get("deltas", [])) 
+            fig_skew.add_trace(go.Scatter(x=x_data, y=vs_data["iv_surface"], mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
+            fig_skew.add_trace(go.Scatter(x=x_data, y=vs_data["iv_surface"], mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
             fig_skew.update_layout(
                 height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title=dict(text="Delta", font=dict(color="#8892B0")), autorange="reversed", showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
+                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
                 yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
             )
             st.plotly_chart(fig_skew, use_container_width=True)
