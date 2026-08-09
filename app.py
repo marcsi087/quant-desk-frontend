@@ -243,24 +243,39 @@ with col_swing:
     """)
 
 with col_micro:
-    st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-    if micro_score >= 60.0:
-        st.success("Directive: 🟢 AGGRESSIVE LONG")
-    elif micro_score <= 40.0:
-        st.error("Directive: 🔴 AGGRESSIVE SHORT")
-    else:
-        st.warning("Directive: ⏳ NEUTRAL / CHOP")
+        st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
+        if micro_score >= 60.0:
+            st.success("Directive: 🟢 AGGRESSIVE LONG")
+        elif micro_score <= 40.0:
+            st.error("Directive: 🔴 AGGRESSIVE SHORT")
+        else:
+            st.warning("Directive: ⏳ NEUTRAL / CHOP")
         
-    mi_setups = setups.get("micro", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Micro Score** | `{micro_score} / 100` |
-    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-    | **Conservative T1** | `${mi_setups.get('t1', 65000):,.2f}` |
-    | **Aggressive T2** | `${mi_setups.get('t2', 65411):,.2f}` |
-    | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600):,.2f}` |
-    """)
+        mi_setups = setups.get("micro", {})
+        mi_t1 = mi_setups.get('t1', 65000.00)
+        mi_t2 = mi_setups.get('t2', 65411.00)
+        mi_sl = mi_setups.get('sl', 63600.00)
+        
+        # --- DIRECTIONAL INVERSION PATCH ---
+        # If score indicates a short, but T1 is plotted above the live spot, invert the matrix
+        if micro_score <= 40.0 and mi_t1 > LIVE_SPOT_PRICE:
+            delta_t1 = mi_t1 - LIVE_SPOT_PRICE
+            delta_t2 = mi_t2 - LIVE_SPOT_PRICE
+            delta_sl = LIVE_SPOT_PRICE - mi_sl
+            
+            mi_t1 = LIVE_SPOT_PRICE - delta_t1
+            mi_t2 = LIVE_SPOT_PRICE - delta_t2
+            mi_sl = LIVE_SPOT_PRICE + delta_sl
+            
+        st.markdown(f"""
+        | Parameter | Target / Level |
+        | :--- | :--- |
+        | **Micro Score** | `{micro_score} / 100` |
+        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+        | **Conservative T1** | `${mi_t1:,.2f}` |
+        | **Aggressive T2** | `${mi_t2:,.2f}` |
+        | **Stop Loss (SL)** | `${mi_sl:,.2f}` |
+        """)
 
 # ==========================================
 # SECTION 3: PLAYBOOK MANIFESTO
