@@ -95,7 +95,6 @@ else:
 
 kelly_display = f"{quarter_kelly:.2f}%"
 
-
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
@@ -293,10 +292,14 @@ with col_micro:
 # ==========================================
 if insights or telemetry:
     render_header("📜 Playbook Manifesto")
-    if macro_score >= 6.0:
+    
+    # --- COLOR MATCH THE DIRECTIVE BIAS ---
+    if "🟢" in exec_gate:
         playbook_color = st.success
-    elif macro_score <= 4.0:
+    elif "🔴" in exec_gate:
         playbook_color = st.error
+    elif "🟡" in exec_gate:
+        playbook_color = st.warning
     else:
         playbook_color = st.info
         
