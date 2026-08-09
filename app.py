@@ -109,10 +109,17 @@ with st.sidebar:
     
     # 2x2 Grid with Bear/Bull Inverse Colors and Educational Tooltips
     pl1, pl2 = st.columns(2)
-    dxy = plumbing.get("dxy", {})
-    sp500 = plumbing.get("sp500", {})
-    us10y = plumbing.get("us10y", {})
-    vix = plumbing.get("vix", {})
+    
+    # Safety Check: Convert to dict if backend sends old string format
+    dxy_raw = plumbing.get("dxy", {})
+    sp500_raw = plumbing.get("sp500", {})
+    us10y_raw = plumbing.get("us10y", {})
+    vix_raw = plumbing.get("vix", {})
+
+    dxy = dxy_raw if isinstance(dxy_raw, dict) else {"value": dxy_raw, "delta": "0.0"}
+    sp500 = sp500_raw if isinstance(sp500_raw, dict) else {"value": sp500_raw, "delta": "0"}
+    us10y = us10y_raw if isinstance(us10y_raw, dict) else {"value": us10y_raw, "delta": "0.0"}
+    vix = vix_raw if isinstance(vix_raw, dict) else {"value": vix_raw, "delta": "0.0"}
 
     with pl1:
         st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Up is bearish for crypto.")
