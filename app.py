@@ -46,7 +46,7 @@ LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
 OPEN_INTEREST = telemetry.get("open_interest", "$7.02B")
-ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00})
+ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00, "atr_pct": 0.01})
 scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
 
 macro_score = scores.get("macro", 6.2)
@@ -57,16 +57,22 @@ setups = telemetry.get("trade_setups", {})
 plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%"})
 insights = telemetry.get("insights", {})
 
-# --- TIERED EXECUTION GATE LOGIC ---
-macro_bull = macro_score >= 5.0
+# --- TIERED EXECUTION GATE LOGIC (REGIME FILTERED) ---
+macro_bull = macro_score >= 5.5
+macro_bear = macro_score <= 4.5
 
-if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+# Detect violent structural divergences to protect capital
+if macro_bull and micro_score <= 45.0:
+    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐂 / MICRO 🐻)"
+elif macro_bear and micro_score >= 55.0:
+    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐻 / MICRO 🐂)"
+elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
+elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
 elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
-elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
@@ -125,7 +131,7 @@ with st.sidebar:
                 macro_pnl = (macro_roi / 100) * macro_collat
                 pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
                 pnl_sign = "+" if macro_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}\\${macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
@@ -138,7 +144,7 @@ with st.sidebar:
                 swing_pnl = (swing_roi / 100) * swing_collat
                 pnl_color_s = "#00E676" if swing_pnl >= 0 else "#FF3366"
                 pnl_sign_s = "+" if swing_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}\\${swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
 # --- HEADER & OVERVIEW ---
 header_col1, header_col2 = st.columns([5, 1])
@@ -274,7 +280,7 @@ if insights or telemetry:
         playbook_color = st.success
     elif "🔴" in exec_gate:
         playbook_color = st.error
-    elif "🟡" in exec_gate:
+    elif "⚠️" in exec_gate or "🟡" in exec_gate:
         playbook_color = st.warning
     else:
         playbook_color = st.info
@@ -310,7 +316,12 @@ if insights or telemetry:
 render_header("🛡️ Desk-Level Risk Gateway")
 rg1, rg2, rg3, rg4 = st.columns(4)
 
-clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
+# Safely split to remove the emoji for a cleaner text display, supporting the new Trap emoji
+if "⚠️" in exec_gate:
+    clean_directive = exec_gate.split(" ", 1)[1]
+else:
+    clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
+
 hm_data = telemetry.get("orderbook_heatmap", {})
 upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
@@ -402,12 +413,18 @@ if insights:
         st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
         
     with cat_col:
-        st.markdown("**⚠️ Upcoming Catalysts**")
+        st.markdown("**⚠️ Upcoming Catalysts & Filters**")
         for cat in insights.get("catalysts", []):
             st.write(f"- {cat}")
             
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
-        # Now pulling dynamically from backend instead of hardcoded string
         action_plan = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
-        st.info(action_plan)
+        
+        # Color match the action plan box to the severity of the guidance
+        if "TRAP" in action_plan:
+            st.error(action_plan)
+        elif "favorable" in action_plan:
+            st.success(action_plan)
+        else:
+            st.warning(action_plan)
