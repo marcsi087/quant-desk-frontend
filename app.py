@@ -21,7 +21,7 @@ td { font-size: 0.95rem; border-bottom: 1px solid #222 !important; padding: 6px 
 </style>
 """, unsafe_allow_html=True)
 
-st_autorefresh(interval=30000, key="data_refresh")
+st_autorefresh(interval=60000, key="data_refresh")
 
 # --- DATA FETCHING ---
 @st.cache_data(ttl=30)
@@ -153,7 +153,7 @@ ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
 
 if FUNDING_RATE < 0:
     st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.")
-elif FUNDING_RATE_PCT > 0.10: # Adjusted sensitivity to prevent false flags on standard baseline funding
+elif FUNDING_RATE_PCT > 0.10: 
     st.warning(f"⚠️ **SYSTEM ALERT: LONG DELEVERAGING RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | High perp premium; late longs susceptible to liquidation.")
 elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
     st.warning(f"⚠️ **SYSTEM ALERT: ABSORPTION / SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.")
@@ -197,7 +197,7 @@ with col_macro:
     | **Aggressive T2** | `${ma_setups.get('t2', 74000.00):,.2f}` |
     | **Stop Loss (SL)** | `${ma_setups.get('sl', 58000.00):,.2f}` |
     """)
-    macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...').replace('$', '\\$')
+    macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...')
     st.caption(f"**Rationale:** {macro_rat}")
 
 with col_swing:
@@ -216,7 +216,7 @@ with col_swing:
     | **Aggressive T2** | `${sw_setups.get('t2', 62800.00):,.2f}` |
     | **Stop Loss (SL)** | `${sw_setups.get('sl', 65411.00):,.2f}` |
     """)
-    swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...').replace('$', '\\$')
+    swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...')
     st.caption(f"**Rationale:** {swing_rat}")
 
 with col_micro:
@@ -237,7 +237,7 @@ with col_micro:
     | **Aggressive T2** | `${mi_setups.get('t2', 65411.00):,.2f}` |
     | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600.00):,.2f}` |
     """)
-    micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...').replace('$', '\\$')
+    micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
     st.caption(f"**Rationale:** {micro_rat}")
 
 # ==========================================
@@ -254,20 +254,20 @@ if insights or telemetry:
     vwap = ta.get("vwap", LIVE_SPOT_PRICE)
     if ny_cvd_raw:
         is_buying, below_vwap = "+" in ny_cvd_raw, LIVE_SPOT_PRICE < vwap
-        safe_cvd = ny_cvd_raw.replace('$', '\\$')
+        safe_cvd = ny_cvd_raw
         
         if is_buying and below_vwap:
-            dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({safe_cvd}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (\\${vwap:,.2f})."
+            dynamic_thesis = f"Positive CVD Divergence: Aggressive NY market buys ({safe_cvd}) are being absorbed by passive limit sellers. Buyers are trapped below VWAP (${vwap:,.2f})."
         elif not is_buying and not below_vwap:
-            dynamic_thesis = f"Negative CVD Divergence: Aggressive NY market sells ({safe_cvd}) are being absorbed by passive limit buyers. Sellers are trapped above VWAP (\\${vwap:,.2f})."
+            dynamic_thesis = f"Negative CVD Divergence: Aggressive NY market sells ({safe_cvd}) are being absorbed by passive limit buyers. Sellers are trapped above VWAP (${vwap:,.2f})."
         elif is_buying and not below_vwap:
             dynamic_thesis = f"Trend Alignment: Aggressive NY market buying ({safe_cvd}) is driving price expansion above VWAP."
         else:
             dynamic_thesis = f"Trend Alignment: Aggressive NY market selling ({safe_cvd}) is forcing price depreciation below VWAP."
     else:
-        dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.').replace('$', '\\$')
+        dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
 
-    safe_guidance = insights.get('institutional_guidance', 'N/A').replace('$', '\\$')
+    safe_guidance = insights.get('institutional_guidance', 'N/A')
     playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {safe_guidance}")
     playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
 
@@ -277,7 +277,6 @@ if insights or telemetry:
 render_header("🛡️ Desk-Level Risk Gateway")
 rg1, rg2, rg3, rg4 = st.columns(4)
 
-# Create a true blended score instead of just duplicating the Swing score
 blended_risk = round(((macro_score * 10) + swing_score + micro_score) / 3, 1)
 
 clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
@@ -304,7 +303,6 @@ else:
     
     with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
-        # Ensure z_matrix is present before attempting to map to Plotly
         if hm_data and "z_matrix" in hm_data:
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=hm_data["z_matrix"], x=hm_data["time_steps"], y=hm_data["prices"],
@@ -317,7 +315,6 @@ else:
                 yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
                 xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
             )
-            # Safe Fallback to Variables rather than rigid Dictionary keys
             fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
             fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
@@ -363,7 +360,8 @@ if insights:
         
     with cat_col:
         st.markdown("**⚠️ Upcoming Catalysts & Filters**")
-        for cat in insights.get("catalysts", []): st.write(f"- {cat.replace('$', '\\$')}")
+        for cat in insights.get("catalysts", []): 
+            st.write(f"- {cat}")
             
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
