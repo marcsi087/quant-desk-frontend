@@ -46,7 +46,7 @@ LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
 OPEN_INTEREST = telemetry.get("open_interest", "$7.02B")
-ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00})
+ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00, "atr_pct": 0.01})
 scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
 
 macro_score = scores.get("macro", 6.2)
@@ -54,19 +54,29 @@ swing_score = scores.get("swing", 42.0)
 micro_score = scores.get("micro", 50.0)
 
 setups = telemetry.get("trade_setups", {})
-plumbing = telemetry.get("macro_plumbing", {"dxy": "99.80", "us10y": "4.74%", "vix": "14.50", "sp500": "5,200"})
+plumbing = telemetry.get("macro_plumbing", {
+    "dxy": {"value": "104.20", "delta": "-0.15"},
+    "us10y": {"value": "4.250%", "delta": "+0.020"},
+    "vix": {"value": "14.50", "delta": "-0.50"},
+    "sp500": {"value": "5,200", "delta": "+45"}
+})
 insights = telemetry.get("insights", {})
 
 # --- TIERED EXECUTION GATE LOGIC ---
-macro_bull = macro_score >= 5.0
+macro_bull = macro_score >= 5.5
+macro_bear = macro_score <= 4.5
 
-if macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+if macro_bull and micro_score <= 45.0:
+    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐂 / MICRO 🐻)"
+elif macro_bear and micro_score >= 55.0:
+    exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐻 / MICRO 🐂)"
+elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif not macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
+elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🔴 FULL DEPLOY (SHORT)"
 elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
     exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
-elif not macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
     exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
 else:
     exec_gate = "⏳ SCALP ONLY / STAND DOWN"
@@ -97,16 +107,21 @@ with st.sidebar:
     
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
     
-    # New 2x2 Grid for Macro Data
+    # 2x2 Grid with Bear/Bull Inverse Colors and Educational Tooltips
     pl1, pl2 = st.columns(2)
+    dxy = plumbing.get("dxy", {})
+    sp500 = plumbing.get("sp500", {})
+    us10y = plumbing.get("us10y", {})
+    vix = plumbing.get("vix", {})
+
     with pl1:
-        st.metric("DXY Index", plumbing.get("dxy", "99.80"))
-        st.metric("S&P 500", plumbing.get("sp500", "5,200"))
+        st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Up is bearish for crypto.")
+        st.metric("S&P 500", sp500.get("value", "5,200"), sp500.get("delta", "+45"), delta_color="normal", help="Global equity correlation. Up is bullish for crypto.")
     with pl2:
-        st.metric("US 10Y", plumbing.get("us10y", "4.74%"))
-        st.metric("VIX", plumbing.get("vix", "14.50"))
+        st.metric("US 10Y Yield", us10y.get("value", "4.25%"), us10y.get("delta", "+0.02"), delta_color="inverse", help="Risk-free rate. Up is bearish for crypto.")
+        st.metric("VIX", vix.get("value", "14.50"), vix.get("delta", "-0.50"), delta_color="inverse", help="Market fear gauge. Up is bearish for crypto.")
         
-    st.caption("Macro Liquidity & Risk Proxies")
+    st.caption("🟢 Bullish Signal | 🔴 Bearish Signal")
     
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
     
@@ -133,7 +148,6 @@ with st.sidebar:
                 macro_pnl = (macro_roi / 100) * macro_collat
                 pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
                 pnl_sign = "+" if macro_pnl >= 0 else ""
-                # Using &#36; to prevent LaTeX corruption inside HTML
                 st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}&#36;{macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
     if track_swing:
@@ -147,7 +161,6 @@ with st.sidebar:
                 swing_pnl = (swing_roi / 100) * swing_collat
                 pnl_color_s = "#00E676" if swing_pnl >= 0 else "#FF3366"
                 pnl_sign_s = "+" if swing_pnl >= 0 else ""
-                # Using &#36; to prevent LaTeX corruption inside HTML
                 st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}&#36;{swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
 # --- HEADER & OVERVIEW ---
@@ -295,7 +308,7 @@ if insights or telemetry:
         playbook_color = st.success
     elif "🔴" in exec_gate:
         playbook_color = st.error
-    elif "🟡" in exec_gate:
+    elif "⚠️" in exec_gate or "🟡" in exec_gate:
         playbook_color = st.warning
     else:
         playbook_color = st.info
@@ -329,7 +342,11 @@ if insights or telemetry:
 render_header("🛡️ Desk-Level Risk Gateway")
 rg1, rg2, rg3, rg4 = st.columns(4)
 
-clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
+if "⚠️" in exec_gate:
+    clean_directive = exec_gate.split(" ", 1)[1]
+else:
+    clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
+
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 
 rg1.metric("Risk Base Score", f"{swing_score} / 100")
@@ -429,4 +446,10 @@ if insights:
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
         action_plan_clean = insights.get("action_plan", "Execute scaling limits only at structural value nodes.").replace('$', '\\$')
-        st.info(action_plan_clean)
+        
+        if "TRAP" in action_plan_clean:
+            st.error(action_plan_clean)
+        elif "favorable" in action_plan_clean:
+            st.success(action_plan_clean)
+        else:
+            st.warning(action_plan_clean)
