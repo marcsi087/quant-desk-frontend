@@ -503,13 +503,19 @@ if research_report and research_report.get("report"):
             for i, (feat_name, feat_data) in enumerate(features.items()):
                 with rf_cols[i % 4]:
                     full = feat_data.get("full_period", {})
-                    r, sig, robust = full.get("r"), full.get("significant"), feat_data.get("robust")
+                    non_overlap = feat_data.get("non_overlapping", {})
+                    r = full.get("r")
+                    robust = feat_data.get("robust")
+                    robust_naive = feat_data.get("robust_naive")
+                    no_n = non_overlap.get("n")
                     if r is None:
                         bias_badge(feat_name, "neutral")
                     elif robust:
-                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust", "bullish" if r > 0 else "bearish")
-                    elif sig:
-                        bias_badge(f"{feat_name}: r={r:+.3f} (not robust)", "neutral")
+                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust (n={no_n} independent)", "bullish" if r > 0 else "bearish")
+                    elif robust_naive:
+                        bias_badge(f"{feat_name}: r={r:+.3f} (fails non-overlap check, n={no_n})", "neutral")
+                    elif full.get("significant"):
+                        bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
                     else:
                         bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
 
