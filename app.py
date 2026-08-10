@@ -7,6 +7,7 @@ from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
+HEATMAP_HISTORY_LEN_FALLBACK = 30  # mirrors backend's HEATMAP_HISTORY_LEN; used only if a payload predates this field
 st.set_page_config(page_title="Quant Desk Multi-Timeframe Terminal", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 # --- CUSTOM CSS ---
@@ -20,8 +21,33 @@ th { color: #8892B0; font-size: 0.85rem; text-transform: uppercase; border-botto
 td { font-size: 0.95rem; border-bottom: 1px solid #222 !important; padding: 6px 0px !important; }
 .stale-badge { background-color: #3D2B00; color: #FFB020; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
 .live-badge { background-color: #0B3D24; color: #00E676; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
+.block-container { max-width: 1500px; margin: 0 auto; padding-left: 2.5rem; padding-right: 2.5rem; }
+.bias-badge { display: inline-block; padding: 3px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: 600; margin: 2px 0 10px 0; }
+.bias-bullish  { background-color: #0B3D24; color: #00E676; }
+.bias-bearish  { background-color: #3D0B18; color: #FF3366; }
+.bias-neutral  { background-color: #3D2B00; color: #FFB020; }
+.bias-conflict { background-color: #241640; color: #B794F6; }
+.status-card { background-color: #10141F; border-left: 4px solid #4FC3F7; border-radius: 4px; padding: 10px 16px; margin-bottom: 10px; font-size: 0.92rem; line-height: 1.5; }
+.status-card.bullish  { border-left-color: #00E676; }
+.status-card.bearish  { border-left-color: #FF3366; }
+.status-card.neutral  { border-left-color: #FFB020; }
+.status-card.conflict { border-left-color: #B794F6; }
+.status-card.info     { border-left-color: #4FC3F7; }
 </style>
 """, unsafe_allow_html=True)
+
+# Two-tier visual language for bias/signal content (kept separate from native
+# st.success/error/warning/info, which stay reserved for real system states
+# like "backend unreachable" so those don't get visually diluted):
+#   - bias_badge: small inline chip, for per-item bias tags (Decision Matrix)
+#   - status_card: dark card with a colored left border, for section-level
+#     summaries (squeeze risk, overall bias, guidance) -- restrained compared
+#     to a full bright alert fill, but still color-coded for a quick scan.
+def bias_badge(text, kind):
+    st.markdown(f'<span class="bias-badge bias-{kind}">{text}</span>', unsafe_allow_html=True)
+
+def status_card(html, kind="info"):
+    st.markdown(f'<div class="status-card {kind}">{html}</div>', unsafe_allow_html=True)
 
 st_autorefresh(interval=60000, key="data_refresh")
 
@@ -205,13 +231,13 @@ lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
 
 if FUNDING_RATE < 0:
-    st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.")
+    status_card(f"⚠️ <b>Short Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.", "bullish")
 elif FUNDING_RATE_PCT > 0.10:
-    st.warning(f"⚠️ **SYSTEM ALERT: LONG DELEVERAGING RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | High perp premium; late longs susceptible to liquidation.")
+    status_card(f"⚠️ <b>Long Deleveraging Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · High perp premium; late longs susceptible to liquidation.", "bearish")
 elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
-    st.warning(f"⚠️ **SYSTEM ALERT: ABSORPTION / SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.")
+    status_card(f"⚠️ <b>Absorption / Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.", "neutral")
 else:
-    st.info(f"ℹ️ **SYSTEM STATUS: NORMAL** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Market structure balanced.")
+    status_card(f"ℹ️ <b>Market Structure Normal</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%.", "info")
 
 def render_header(title):
     st.markdown(f"<h4 style='color: #E0E0E0; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 40px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;'>{title}</h4>", unsafe_allow_html=True)
@@ -233,20 +259,22 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 # SECTION 1: LIVE MARKET OVERVIEW
 # ==========================================
 render_header("📊 Live Market Overview")
-ov_r1c1, ov_r1c2, ov_r1c3 = st.columns(3)
-ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
-ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+with st.container(border=True):
+    ov_r1c1, ov_r1c2, ov_r1c3 = st.columns(3)
+    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
+    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
+    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
 
-ov_r2c1, ov_r2c2 = st.columns(2)
-ov_r2c1.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
-ov_r2c2.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
-st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
+    ov_r2c1, ov_r2c2 = st.columns(2)
+    ov_r2c1.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
+    ov_r2c2.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
+    st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
 
-if "🟢" in exec_gate: st.success(f"**Overall Bias:** {exec_gate}")
-elif "🔴" in exec_gate: st.error(f"**Overall Bias:** {exec_gate}")
-elif "⚠️" in exec_gate or "🟡" in exec_gate: st.warning(f"**Overall Bias:** {exec_gate}")
-else: st.info(f"**Overall Bias:** {exec_gate}")
+if "🟢" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bullish")
+elif "🔴" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bearish")
+elif "⚠️" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "conflict")
+elif "🟡" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "neutral")
+else: status_card(f"<b>Overall Bias:</b> {exec_gate}", "info")
 
 # ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX
@@ -255,66 +283,69 @@ render_header("🧠 Decision Matrix")
 col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
-    st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
-    st.caption("Blends DXY, 10Y yield, VIX, S&P 500, plus BTC's own trend.")
-    if macro_score >= 5.5: st.success(f"Bias: Bullish 🐂 ({macro_conf} Confidence)")
-    elif macro_score <= 4.5: st.error(f"Bias: Bearish 🐻 ({macro_conf} Confidence)")
-    else: st.warning(f"Bias: Neutral / Choppy ({macro_conf} Confidence)")
+    with st.container(border=True):
+        st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
+        st.caption("Blends DXY, 10Y yield, VIX, S&P 500, plus BTC's own trend.")
+        if macro_score >= 5.5: bias_badge(f"🐂 Bullish · {macro_conf} Confidence", "bullish")
+        elif macro_score <= 4.5: bias_badge(f"🐻 Bearish · {macro_conf} Confidence", "bearish")
+        else: bias_badge(f"Neutral / Choppy · {macro_conf} Confidence", "neutral")
 
-    ma_setups = setups.get("macro", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Macro Score** | `{macro_score} / 10` |
-    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-    | **Conservative T1** | `${ma_setups.get('t1', 70000.00):,.2f}` |
-    | **Aggressive T2** | `${ma_setups.get('t2', 74000.00):,.2f}` |
-    | **Stop Loss (SL)** | `${ma_setups.get('sl', 58000.00):,.2f}` |
-    """)
-    macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...')
-    st.caption(f"**Rationale:** {macro_rat}")
+        ma_setups = setups.get("macro", {})
+        st.markdown(f"""
+        | Parameter | Target / Level |
+        | :--- | :--- |
+        | **Macro Score** | `{macro_score} / 10` |
+        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+        | **Conservative T1** | `${ma_setups.get('t1', 70000.00):,.2f}` |
+        | **Aggressive T2** | `${ma_setups.get('t2', 74000.00):,.2f}` |
+        | **Stop Loss (SL)** | `${ma_setups.get('sl', 58000.00):,.2f}` |
+        """)
+        macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...')
+        st.caption(f"**Rationale:** {macro_rat}")
 
 with col_swing:
-    st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
-    st.caption("Blends 24h price change, VWAP divergence, and funding rate.")
-    if swing_score >= 52.0: st.success(f"Bias: Bullish ({swing_conf} Confidence)")
-    elif swing_score <= 48.0: st.error(f"Bias: Bearish ({swing_conf} Confidence)")
-    else: st.warning(f"Bias: Neutral / Choppy ({swing_conf} Confidence)")
+    with st.container(border=True):
+        st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
+        st.caption("Blends 24h price change, VWAP divergence, and funding rate.")
+        if swing_score >= 52.0: bias_badge(f"Bullish · {swing_conf} Confidence", "bullish")
+        elif swing_score <= 48.0: bias_badge(f"Bearish · {swing_conf} Confidence", "bearish")
+        else: bias_badge(f"Neutral / Choppy · {swing_conf} Confidence", "neutral")
 
-    sw_setups = setups.get("tactical", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Swing Score** | `{swing_score} / 100` |
-    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-    | **Conservative T1** | `${sw_setups.get('t1', 63500.00):,.2f}` |
-    | **Aggressive T2** | `${sw_setups.get('t2', 62800.00):,.2f}` |
-    | **Stop Loss (SL)** | `${sw_setups.get('sl', 65411.00):,.2f}` |
-    """)
-    swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...')
-    st.caption(f"**Rationale:** {swing_rat}")
+        sw_setups = setups.get("tactical", {})
+        st.markdown(f"""
+        | Parameter | Target / Level |
+        | :--- | :--- |
+        | **Swing Score** | `{swing_score} / 100` |
+        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+        | **Conservative T1** | `${sw_setups.get('t1', 63500.00):,.2f}` |
+        | **Aggressive T2** | `${sw_setups.get('t2', 62800.00):,.2f}` |
+        | **Stop Loss (SL)** | `${sw_setups.get('sl', 65411.00):,.2f}` |
+        """)
+        swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...')
+        st.caption(f"**Rationale:** {swing_rat}")
 
 with col_micro:
-    st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-    st.caption("Blends RSI(14) momentum and VWAP divergence.")
-    micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
+    with st.container(border=True):
+        st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
+        st.caption("Blends RSI(14) momentum and VWAP divergence.")
+        micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
 
-    if "🟢" in micro_dir: st.success(f"Bias: {micro_dir}")
-    elif "🔴" in micro_dir: st.error(f"Bias: {micro_dir}")
-    else: st.warning(f"Bias: {micro_dir}")
+        if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
+        elif "🔴" in micro_dir: bias_badge(micro_dir, "bearish")
+        else: bias_badge(micro_dir, "neutral")
 
-    mi_setups = setups.get("micro", {})
-    st.markdown(f"""
-    | Parameter | Target / Level |
-    | :--- | :--- |
-    | **Micro Score** | `{micro_score} / 100` |
-    | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-    | **Conservative T1** | `${mi_setups.get('t1', 65000.00):,.2f}` |
-    | **Aggressive T2** | `${mi_setups.get('t2', 65411.00):,.2f}` |
-    | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600.00):,.2f}` |
-    """)
-    micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
-    st.caption(f"**Rationale:** {micro_rat}")
+        mi_setups = setups.get("micro", {})
+        st.markdown(f"""
+        | Parameter | Target / Level |
+        | :--- | :--- |
+        | **Micro Score** | `{micro_score} / 100` |
+        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
+        | **Conservative T1** | `${mi_setups.get('t1', 65000.00):,.2f}` |
+        | **Aggressive T2** | `${mi_setups.get('t2', 65411.00):,.2f}` |
+        | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600.00):,.2f}` |
+        """)
+        micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
+        st.caption(f"**Rationale:** {micro_rat}")
 
 # ==========================================
 # TRACK RECORD — does this signal actually work?
@@ -350,20 +381,21 @@ else:
     ]
     for tier_key, tier_label, col in tier_meta:
         with col:
-            tier_data = track_record.get("tiers", {}).get(tier_key, {})
-            horizon = tier_data.get("horizon", "")
-            st.markdown(f"**{tier_label}** · {horizon} forward return")
-            buckets = tier_data.get("buckets", {})
-            for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
-                b = buckets.get(bucket_key, {})
-                n = b.get("n", 0)
-                if not b.get("sufficient_sample"):
-                    st.caption(f"{bucket_label}: n={n} — still collecting (need {track_record.get('min_sample_size', 20)})")
-                else:
-                    avg_r = b.get("avg_return_pct")
-                    pct_pos = b.get("pct_positive")
-                    sign = "+" if avg_r is not None and avg_r >= 0 else ""
-                    st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n}")
+            with st.container(border=True):
+                tier_data = track_record.get("tiers", {}).get(tier_key, {})
+                horizon = tier_data.get("horizon", "")
+                st.markdown(f"**{tier_label}** · {horizon} forward return")
+                buckets = tier_data.get("buckets", {})
+                for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
+                    b = buckets.get(bucket_key, {})
+                    n = b.get("n", 0)
+                    if not b.get("sufficient_sample"):
+                        st.caption(f"{bucket_label}: n={n} — still collecting (need {track_record.get('min_sample_size', 20)})")
+                    else:
+                        avg_r = b.get("avg_return_pct")
+                        pct_pos = b.get("pct_positive")
+                        sign = "+" if avg_r is not None and avg_r >= 0 else ""
+                        st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n}")
     st.caption(track_record.get("caveat", ""))
 
 # ==========================================
@@ -372,15 +404,15 @@ else:
 if insights or telemetry:
     render_header("📜 Signal Summary")
 
-    if "🟢" in exec_gate: playbook_color = st.success
-    elif "🔴" in exec_gate: playbook_color = st.error
-    elif "⚠️" in exec_gate or "🟡" in exec_gate: playbook_color = st.warning
-    else: playbook_color = st.info
+    if "🟢" in exec_gate: sig_kind = "bullish"
+    elif "🔴" in exec_gate: sig_kind = "bearish"
+    elif "⚠️" in exec_gate: sig_kind = "conflict"
+    elif "🟡" in exec_gate: sig_kind = "neutral"
+    else: sig_kind = "info"
 
     dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
     safe_guidance = insights.get('institutional_guidance', 'N/A')
-    playbook_color(f"**🛡️ GUIDANCE:** {safe_guidance}")
-    playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
+    status_card(f"🛡️ <b>Guidance:</b> {safe_guidance}<br>🧠 <b>Liquidity Thesis:</b> {dynamic_thesis}", sig_kind)
 
 # ==========================================
 # SECTION 4: RISK GATEWAY
@@ -389,34 +421,41 @@ render_header("🛡️ Desk-Level Risk Gateway")
 
 blended_risk = round(((macro_score * 10) + swing_score + micro_score) / 3, 1)
 
-rg1, rg2, rg3 = st.columns(3)
-rg1.metric("Risk Base Score", f"{blended_risk} / 100", help="Blended read across all three tiers (macro ×10, swing, micro, averaged). Higher = more bullish composite.")
-rg2.metric("Upper Liq Wall", f"${upper_wall:,.0f}", help="Nearest large resting sell-side liquidity cluster above spot.")
-rg3.metric("Lower Liq Wall", f"${lower_wall:,.0f}", help="Nearest large resting buy-side liquidity cluster below spot.")
+with st.container(border=True):
+    rg1, rg2, rg3 = st.columns(3)
+    rg1.metric("Risk Base Score", f"{blended_risk} / 100", help="Blended read across all three tiers (macro ×10, swing, micro, averaged). Higher = more bullish composite.")
+    rg2.metric("Upper Liq Wall", f"${upper_wall:,.0f}", help="Nearest large resting sell-side liquidity cluster above spot.")
+    rg3.metric("Lower Liq Wall", f"${lower_wall:,.0f}", help="Nearest large resting buy-side liquidity cluster below spot.")
 
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
 # ==========================================
 render_header("🔬 Telemetry & Liquidity")
 if not telemetry:
-    st.error("⚠️ Backend API is currently unreachable. Retrying in 30 seconds...")
+    st.caption("Telemetry unavailable while the backend is unreachable (see banner above).")
 else:
     session_info = telemetry.get("session_cvd", {})
-    sc1, sc2, sc3 = st.columns(3)
     cvd_help = "Cumulative Volume Delta: running total of aggressive buy volume minus sell volume for this session. Positive means market buys are outweighing market sells."
-    with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""), help=cvd_help)
-    with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""), help=cvd_help)
-    with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""), help=cvd_help)
+    with st.container(border=True):
+        sc1, sc2, sc3 = st.columns(3)
+        with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""), help=cvd_help)
+        with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""), help=cvd_help)
+        with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""), help=cvd_help)
     st.caption("Known limitation: sessions are bucketed by hour-of-day across a rolling 24h window, so whichever session is currently in progress shows a partial read rather than a full prior session. Not yet fixed — flagged here rather than presented as directly comparable.")
 
     st.markdown("<br>", unsafe_allow_html=True)
     viz_col1, viz_col2 = st.columns([2, 1])
+    CHART_HEIGHT = 480  # shared by both charts so they align edge-to-edge
 
     with viz_col1:
+      with st.container(border=True):
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
+        snapshots_collected = hm_data.get("snapshots_collected", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else 0
+        snapshots_total = hm_data.get("snapshots_total", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else HEATMAP_HISTORY_LEN_FALLBACK
+        MIN_SNAPSHOTS_TO_RENDER = 10
 
-        if len(z_matrix) > 0:
+        if len(z_matrix) > 0 and snapshots_collected >= MIN_SNAPSHOTS_TO_RENDER:
             try:
                 z_array = np.array(z_matrix, dtype=float)
                 time_steps = hm_data.get("time_steps", [])
@@ -452,7 +491,7 @@ else:
                     xgap=1, ygap=1,  # thin gaps between cells read as a grid, not a blob
                 ))
                 fig_heatmap.update_layout(
-                    height=520, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
+                    height=CHART_HEIGHT, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0"), automargin=True),
                     xaxis=dict(title=dict(text="Snapshots (Older → Newer)", font=dict(color="#8892B0")), showgrid=False, tickfont=dict(color="#8892B0"), tickmode="array", tickvals=tick_vals, ticktext=tick_vals, automargin=True),
@@ -461,13 +500,20 @@ else:
                 fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1.5, annotation_text="Lower Support", annotation_font=dict(color="#00E676", size=11))
                 fig_heatmap.add_hline(y=LIVE_SPOT_PRICE, line_dash="solid", line_color="#F5F5F5", line_width=1, opacity=0.55, annotation_text="Spot", annotation_font=dict(color="#F5F5F5", size=11), annotation_position="left")
                 st.plotly_chart(fig_heatmap, use_container_width=True)
-                st.caption("Price axis is a fixed grid that only shifts when spot trades outside it (history resets on shift). Cells are shown unsmoothed so bucket boundaries stay accurate.")
+                st.caption("Price axis is a fixed grid that only shifts when spot trades outside it. Cells are shown unsmoothed so bucket boundaries stay accurate.")
             except Exception:
                 st.info("🗺️ Heatmap rendering matrix...")
+        elif len(z_matrix) > 0:
+            # Grid just reset (spot moved outside its previous range) -- rather
+            # than render a chart that's mostly still-empty padding (which reads
+            # as broken), show an honest progress state until there's enough
+            # real data for the picture to be meaningful.
+            st.info(f"🗺️ Rebuilding after a price move — collecting snapshot {snapshots_collected}/{snapshots_total}. The grid resets when spot trades outside its current range.")
         else:
             st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
 
     with viz_col2:
+      with st.container(border=True):
         st.markdown("**📉 Deribit Volatility Skew**")
         vs_data = telemetry.get("volatility_skew", {})
         strike_vals = vs_data.get("strikes", [])
@@ -479,10 +525,10 @@ else:
             fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
             fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
             fig_skew.update_layout(
-                height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
+                height=CHART_HEIGHT, margin=dict(l=10, r=10, t=20, b=10), template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
-                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
+                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True),
+                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True)
             )
             st.plotly_chart(fig_skew, use_container_width=True)
             st.caption(f"Single expiry only: {expiry_label} (no longer blended across tenors).")
@@ -492,10 +538,11 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("**⛓️ On-Chain Exchange Flows**")
     oc_data = telemetry.get("onchain_flows", {})
-    oc1, oc2, oc3 = st.columns(3)
-    with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption", help="BTC moving onto (positive) or off (negative) exchanges. Net outflow is often read as accumulation.")
-    with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power", help="New stablecoin issuance, often watched as a proxy for fresh buying power entering crypto markets.")
-    with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"), help="Direction of total BTC held on exchanges. A declining trend is generally read as coins moving to longer-term holding.")
+    with st.container(border=True):
+        oc1, oc2, oc3 = st.columns(3)
+        with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption", help="BTC moving onto (positive) or off (negative) exchanges. Net outflow is often read as accumulation.")
+        with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power", help="New stablecoin issuance, often watched as a proxy for fresh buying power entering crypto markets.")
+        with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"), help="Direction of total BTC held on exchanges. A declining trend is generally read as coins moving to longer-term holding.")
 
 # ==========================================
 # SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
@@ -505,27 +552,24 @@ if insights:
     vp_col, cat_col, guide_col = st.columns(3)
 
     with vp_col:
-        st.markdown("**📊 Volume Profile**")
-        vp = insights.get("volume_profile", {})
-        st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
-        st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
-        st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
+        with st.container(border=True):
+            st.markdown("**📊 Volume Profile**")
+            vp = insights.get("volume_profile", {})
+            st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
+            st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
+            st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
 
     with cat_col:
-        st.markdown("**⚠️ Upcoming Catalysts & Filters**")
-        for cat in insights.get("catalysts", []):
-            st.write(f"- {cat}")
+        with st.container(border=True):
+            st.markdown("**⚠️ Upcoming Catalysts & Filters**")
+            for cat in insights.get("catalysts", []):
+                st.write(f"- {cat}")
 
     with guide_col:
-        st.markdown("**🧭 Signal Interpretation**")
-        raw_action = insights.get("action_plan", "Scores are near neutral across timeframes right now.")
-        action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
-        tone = insights.get("action_plan_tone", "neutral")
-        if tone == "conflict":
-            st.error(action_plan_clean)
-        elif tone == "bullish":
-            st.success(action_plan_clean)
-        elif tone == "bearish":
-            st.warning(action_plan_clean)
-        else:
-            st.info(action_plan_clean)
+        with st.container(border=True):
+            st.markdown("**🧭 Signal Interpretation**")
+            raw_action = insights.get("action_plan", "Scores are near neutral across timeframes right now.")
+            action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
+            tone = insights.get("action_plan_tone", "info")
+            kind_map = {"conflict": "conflict", "bullish": "bullish", "bearish": "bearish"}
+            status_card(action_plan_clean, kind_map.get(tone, "info"))
