@@ -624,5 +624,5 @@ if insights:
             raw_action = insights.get("action_plan", "Scores are near neutral across timeframes right now.")
             action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
             tone = insights.get("action_plan_tone", "info")
-            kind_map = {"conflict": "conflict", "bullish": "bullish", "bearish": "bearish"}
+            kind_map = {"conflict": "conflict", "bullish": "bullish", "bearish": "bearish", "neutral": "neutral"}
             status_card(action_plan_clean, kind_map.get(tone, "info"))
