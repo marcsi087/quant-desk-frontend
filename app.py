@@ -290,49 +290,46 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     viz_col1, viz_col2 = st.columns([2, 1])
     
-    with viz_col1:
+   with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
         
-        # Safely extract z_matrix and check that it contains valid data rows
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
         has_valid_data = len(z_matrix) > 0 and any(any(row) for row in z_matrix)
 
-if hm_data and has_valid_data:
+        if hm_data and has_valid_data:
+            # Convert to numpy array to ensure clean numerical handling and prevent flat color scaling
+            z_array = np.array(z_matrix, dtype=float)
+            
+            # Dynamic zmin/zmax clamping based on actual data percentiles to guarantee contrast
+            z_min = float(np.percentile(z_array[z_array > 0], 5)) if np.any(z_array > 0) else 0
+            z_max = float(np.percentile(z_array, 95)) if np.any(z_array > 0) else 15
+            if z_min == z_max:
+                z_max = z_min + 1.0
+
             fig_heatmap = go.Figure(data=go.Heatmap(
-                z=z_matrix, 
+                z=z_array, 
                 x=hm_data.get("time_steps", []), 
                 y=hm_data.get("prices", []),
                 colorscale='Turbo', 
                 showscale=True,
-                zmin=0, zmax=15, # Clamps the scale to prevent flat saturation
+                zmin=z_min, 
+                zmax=z_max,
                 colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
             ))
             fig_heatmap.update_layout(
-                height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                height=400, 
+                margin=dict(l=0, r=0, t=20, b=0), 
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", 
+                plot_bgcolor="rgba(0,0,0,0)",
                 yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
                 xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
             )
             fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
             fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
-    with viz_col2:
-        st.markdown("**📉 Deribit Volatility Skew**")
-        vs_data = telemetry.get("volatility_skew", {})
-        if vs_data:
-            fig_skew = go.Figure()
-            # Note: X-axis now mapped to "strikes" instead of "deltas" for real data
-            x_data = vs_data.get("strikes", vs_data.get("deltas", [])) 
-            fig_skew.add_trace(go.Scatter(x=x_data, y=vs_data["iv_surface"], mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
-            fig_skew.add_trace(go.Scatter(x=x_data, y=vs_data["iv_surface"], mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
-            fig_skew.update_layout(
-                height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
-                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
-            )
-            st.plotly_chart(fig_skew, use_container_width=True)
-
+        else:
+            st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("**⛓️ On-Chain Exchange Flows**")
     oc_data = telemetry.get("onchain_flows", {})
