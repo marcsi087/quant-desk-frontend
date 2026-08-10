@@ -387,6 +387,44 @@ elif "🟡" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "neut
 else: status_card(f"<b>Overall Bias:</b> {exec_gate}", "info")
 
 # ==========================================
+# PRICE CHART — the one thing every trading dashboard should lead with,
+# which this one didn't have until now
+# ==========================================
+price_chart_data = telemetry.get("price_chart", [])
+if price_chart_data:
+    render_header("📈 BTC/USD — Last 8 Days (1H)")
+    with st.container(border=True):
+        times = [datetime.fromtimestamp(p["t"], tz=timezone.utc) for p in price_chart_data]
+        opens = [p["o"] for p in price_chart_data]
+        highs = [p["h"] for p in price_chart_data]
+        lows = [p["l"] for p in price_chart_data]
+        closes = [p["c"] for p in price_chart_data]
+
+        fig_price = go.Figure(data=go.Candlestick(
+            x=times, open=opens, high=highs, low=lows, close=closes,
+            increasing_line_color="#00E676", decreasing_line_color="#FF3366",
+            increasing_fillcolor="#00E676", decreasing_fillcolor="#FF3366",
+            name="BTC/USD",
+        ))
+        vwap_val = ta.get("vwap", LIVE_SPOT_PRICE)
+        fig_price.add_hline(y=vwap_val, line_dash="dot", line_color="#00FFCC", line_width=1.5,
+                             annotation_text=f"Session VWAP ${vwap_val:,.0f}", annotation_font=dict(color="#00FFCC", size=11))
+        fig_price.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
+                             annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=10), opacity=0.6)
+        fig_price.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
+                             annotation_text="Lower Wall", annotation_font=dict(color="#00E676", size=10), opacity=0.6)
+        fig_price.update_layout(
+            height=420, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"), rangeslider=dict(visible=False), automargin=True),
+            yaxis=dict(title=dict(text="Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f",
+                       showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#8892B0"), automargin=True),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_price, use_container_width=True)
+        st.caption("Real hourly candles from Binance, same fetch that powers 7-Day Momentum on the Confluence Board below. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
+
+# ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX
 # ==========================================
 render_header("🧠 Decision Matrix")
