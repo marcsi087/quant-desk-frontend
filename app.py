@@ -316,8 +316,6 @@ if hm_data and has_valid_data:
             fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
             fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
             st.plotly_chart(fig_heatmap, use_container_width=True)
-    
-            st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
     with viz_col2:
         st.markdown("**📉 Deribit Volatility Skew**")
         vs_data = telemetry.get("volatility_skew", {})
