@@ -715,6 +715,40 @@ else:
         st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
 
 # ==========================================
+# CONFLUENCE BOARD — live context for Swing/Macro thinking, not a score
+# ==========================================
+confluence = telemetry.get("confluence_board")
+if confluence:
+    render_header("🧭 Confluence Board — Swing & Macro Context")
+    st.caption("Six real, live inputs relevant to a multi-day-to-multi-week view of Bitcoin — each shown with its own honest lean and explanation. This is deliberately NOT a single composite score: we tested that approach for Swing and Macro against ~2 years of real data and found no reliable edge (see Track Record and Factor Research). This organizes real information for your own judgment instead.")
+
+    SCENARIO_KIND_MAP = {
+        "strong_bullish": "bullish", "strong_bearish": "bearish",
+        "moderate_bullish": "bullish", "moderate_bearish": "bearish",
+        "split": "conflict", "quiet": "neutral",
+    }
+    LEAN_BADGE_KIND = {"bullish": "bullish", "bearish": "bearish", "neutral": "neutral"}
+
+    factor_cols = st.columns(3)
+    for i, factor in enumerate(confluence.get("factors", [])):
+        with factor_cols[i % 3]:
+            with st.container(border=True):
+                st.markdown(f"**{factor['label']}**")
+                bias_badge(f"{factor['value_str']} · {factor['lean'].title()}", LEAN_BADGE_KIND.get(factor['lean'], "neutral"))
+                st.caption(factor["explanation"])
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    b, r, n = confluence.get("bullish_count", 0), confluence.get("bearish_count", 0), confluence.get("neutral_count", 0)
+    scenario_kind = SCENARIO_KIND_MAP.get(confluence.get("scenario"), "info")
+    status_card(
+        f"{confluence.get('scenario_icon', '')} <b>{confluence.get('scenario_label', '')}</b> — "
+        f"{b} bullish · {r} bearish · {n} neutral<br>{confluence.get('scenario_summary', '')}",
+        scenario_kind,
+    )
+    st.markdown(confluence.get("scenario_explanation", ""))
+    st.caption(confluence.get("disclaimer", ""))
+
+# ==========================================
 # SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
 # ==========================================
 if insights:
