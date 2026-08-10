@@ -65,6 +65,16 @@ def get_telemetry():
 
 telemetry = get_telemetry()
 
+@st.cache_data(ttl=300)
+def get_track_record():
+    try:
+        r = requests.get(f"{API_URL}/track-record", timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return {}
+
 # PULL LIVE TELEMETRY VARIABLES
 LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
@@ -129,11 +139,13 @@ else:
 # rather than showing a number nobody can act on. ---
 sizing = telemetry.get("sizing_guide", {})
 sizing_bucket = sizing.get("current_bucket", "neutral").title()
+sizing_live_n, sizing_bt_n = sizing.get("live_n", 0), sizing.get("backtest_n", 0)
+sizing_src_note = f"{sizing_live_n} live-observed, {sizing_bt_n} backtested" if sizing_bt_n else f"{sizing_live_n} live-observed"
 if sizing.get("available"):
     kelly_display = f"{sizing['quarter_kelly_pct']:.2f}%"
     sizing_help = (
-        f"Based on {sizing['sample_size']} historical Swing-{sizing_bucket} readings on this instance: "
-        f"{sizing['win_rate_pct']:.0f}% ended positive, avg win +{sizing['avg_win_pct']:.2f}%, "
+        f"Based on {sizing['sample_size']} historical Swing-{sizing_bucket} readings on this instance "
+        f"({sizing_src_note}): {sizing['win_rate_pct']:.0f}% ended positive, avg win +{sizing['avg_win_pct']:.2f}%, "
         f"avg loss -{sizing['avg_loss_pct']:.2f}%. Quarter-Kelly of that edge is shown. Still a small, "
         f"instance-specific sample, not a professionally validated figure -- not investment advice."
     )
@@ -143,8 +155,8 @@ else:
     kelly_display = f"Collecting ({n}/{min_n})"
     sizing_help = (
         f"Not enough history yet for Swing-{sizing_bucket} readings to estimate a real edge "
-        f"({n} of {min_n} needed). Check the Track Record section below, or come back once more "
-        f"readings like this one have accumulated."
+        f"({n} of {min_n} needed, {sizing_src_note}). Run a historical backtest from Settings to bootstrap "
+        f"this quickly, or check back once more live readings like this one have accumulated."
     )
 
 # --- SIDEBAR CONTROLS ---
@@ -217,6 +229,26 @@ with header_col2:
         if st.button("🔄 Force Sync"):
             get_telemetry.clear()
             st.rerun()
+
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**📈 Bootstrap Track Record**")
+        st.caption("Seeds the Track Record from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data.")
+        bt_months = st.number_input("Months of history", min_value=1, max_value=36, value=12, step=1, key="bt_months")
+        if st.button("Run Historical Backtest"):
+            with st.spinner("Fetching historical data and reconstructing scores — this can take a minute..."):
+                try:
+                    bt_resp = requests.post(f"{API_URL}/backtest/run", params={"months": int(bt_months)}, timeout=180)
+                    bt_result = bt_resp.json() if bt_resp.status_code == 200 else {"status": "error", "error": f"HTTP {bt_resp.status_code}"}
+                except Exception as e:
+                    bt_result = {"status": "error", "error": str(e)}
+            if bt_result.get("status") == "completed":
+                st.success(f"Inserted {bt_result.get('inserted', 0)} backtested rows from {bt_result.get('kline_count', 0)} hourly candles.")
+                get_telemetry.clear()
+                get_track_record.clear()
+            elif bt_result.get("status") == "already_running":
+                st.warning("A backtest is already running — check back shortly.")
+            else:
+                st.error(f"Backtest failed: {bt_result.get('error', 'unknown error')}")
 
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
@@ -379,16 +411,6 @@ with col_micro:
 # ==========================================
 # TRACK RECORD — does this signal actually work?
 # ==========================================
-@st.cache_data(ttl=300)
-def get_track_record():
-    try:
-        r = requests.get(f"{API_URL}/track-record", timeout=10)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
-    return {}
-
 track_record = get_track_record()
 
 render_header("📈 Track Record — Does This Signal Actually Work?")
@@ -418,13 +440,15 @@ else:
                 for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
                     b = buckets.get(bucket_key, {})
                     n = b.get("n", 0)
+                    live_n, bt_n = b.get("live_n", 0), b.get("backtest_n", 0)
+                    src_note = f"{live_n} live, {bt_n} backtest" if bt_n else f"{live_n} live"
                     if not b.get("sufficient_sample"):
-                        st.caption(f"{bucket_label}: n={n} — still collecting (need {track_record.get('min_sample_size', 20)})")
+                        st.caption(f"{bucket_label}: n={n} ({src_note}) — still collecting (need {track_record.get('min_sample_size', 20)})")
                     else:
                         avg_r = b.get("avg_return_pct")
                         pct_pos = b.get("pct_positive")
                         sign = "+" if avg_r is not None and avg_r >= 0 else ""
-                        st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n}")
+                        st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
     st.caption(track_record.get("caveat", ""))
 
 # ==========================================
