@@ -316,20 +316,22 @@ else:
                 if z_min >= z_max:
                     z_max = z_min + 1.0
 
+                # Use absolute 0 floor so empty buckets stay dark background
+                z_max = float(np.percentile(z_array[z_array > 0], 98)) if np.any(z_array > 0) else 10.0
+
                 fig_heatmap = go.Figure(data=go.Heatmap(
-                    z=z_array,
-                    x=time_steps if time_steps else None,
+                    z=z_array, 
+                    x=time_steps if time_steps else None, 
                     y=prices if prices else None,
-                    colorscale='Turbo',
+                    colorscale='Turbo', 
                     showscale=True,
-                    zmin=z_min,
+                    zmin=0.0, 
                     zmax=z_max,
-                    zsmooth='best',  # <-- This triggers the continuous gradient interpolation
-                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0")
-                    )
+                    zsmooth='best',
+                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
                 ))
                 fig_heatmap.update_layout(
-                    height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
+                    height=480, margin=dict(l=0, r=0, t=10, b=0), template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                     yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
                     xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
