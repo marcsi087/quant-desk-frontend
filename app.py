@@ -297,13 +297,14 @@ else:
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
         has_valid_data = len(z_matrix) > 0 and any(any(row) for row in z_matrix)
 
-        if hm_data and has_valid_data:
+       if hm_data and has_valid_data:
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=z_matrix, 
                 x=hm_data.get("time_steps", []), 
                 y=hm_data.get("prices", []),
                 colorscale='Turbo', 
                 showscale=True,
+                zmin=0, zmax=15, # Clamps the scale to prevent flat saturation
                 colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
             ))
             fig_heatmap.update_layout(
