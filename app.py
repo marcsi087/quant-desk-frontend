@@ -394,9 +394,13 @@ if insights:
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
         raw_action = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
-        # Strip out any lingering markdown asterisk/formatting corruption from JSON transfer
-        action_plan_clean = raw_action.replace("*", "").replace("  ", " ")
         
-        if "TRAP" in action_plan_clean: st.error(action_plan_clean)
-        elif "favorable" in action_plan_clean: st.success(action_plan_clean)
-        else: st.warning(action_plan_clean)
+        # Escape dollar signs to prevent Streamlit from triggering LaTeX math mode formatting
+        action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
+        
+        if "TRAP" in action_plan_clean: 
+            st.error(action_plan_clean)
+        elif "favorable" in action_plan_clean or "Bullish" in action_plan_clean: 
+            st.success(action_plan_clean)
+        else: 
+            st.warning(action_plan_clean)
