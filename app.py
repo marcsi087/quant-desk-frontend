@@ -297,7 +297,7 @@ else:
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
         has_valid_data = len(z_matrix) > 0 and any(any(row) for row in z_matrix)
 
-     if hm_data and has_valid_data:
+if hm_data and has_valid_data:
             fig_heatmap = go.Figure(data=go.Heatmap(
                 z=z_matrix, 
                 x=hm_data.get("time_steps", []), 
