@@ -86,17 +86,24 @@ insights = telemetry.get("insights", {})
 
 # --- BIAS + CONFIDENCE (educational framing: state the bias and how far it
 # is from neutral, never an instruction to act) ---
-def confidence_label(score, neutral, scale):
-    distance = abs(score - neutral) / scale
-    if distance < 0.15:
+def confidence_label(score, bull_thresh, bear_thresh, scale_max):
+    if score >= bull_thresh:
+        room = scale_max - bull_thresh
+        progress = (score - bull_thresh) / room if room > 0 else 0.0
+    elif score <= bear_thresh:
+        room = bear_thresh
+        progress = (bear_thresh - score) / room if room > 0 else 0.0
+    else:
         return "Low"
-    elif distance < 0.35:
+    if progress < 0.33:
+        return "Low"
+    elif progress < 0.66:
         return "Moderate"
     return "High"
 
-macro_conf = confidence_label(macro_score, 5.0, 5.0)
-swing_conf = confidence_label(swing_score, 50.0, 50.0)
-micro_conf = confidence_label(micro_score, 50.0, 50.0)
+macro_conf = confidence_label(macro_score, 5.5, 4.5, 10.0)
+swing_conf = confidence_label(swing_score, 52.0, 48.0, 100.0)
+micro_conf = confidence_label(micro_score, 55.0, 45.0, 100.0)
 
 macro_bull, macro_bear = macro_score >= 5.5, macro_score <= 4.5
 if macro_bull and micro_score <= 45.0:
@@ -114,27 +121,37 @@ elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
 else:
     exec_gate = "⏳ No Clear Bias — Mixed Signals (Low Confidence)"
 
-# --- HEURISTIC SIZING GUIDE (formerly labeled "Kelly Criterion") ---
-# swing_score is an unbacktested composite technical score, not a calibrated
-# win probability. Feeding it into a real Kelly formula would overstate
-# precision. Shown as an illustrative conviction gauge only -- NOT a
-# position-sizing recommendation -- until it's been validated against
-# realized forward returns.
-W = (swing_score / 100.0) if swing_score >= 50.0 else ((100.0 - swing_score) / 100.0)
-s_setups = setups.get("tactical", {})
-s_entry, s_t2, s_sl = s_setups.get('entry', LIVE_SPOT_PRICE), s_setups.get('t2', 62800.00), s_setups.get('sl', 65411.00)
-reward, risk = abs(s_entry - s_t2), abs(s_entry - s_sl)
-if risk > 0:
-    R = reward / risk
-    quarter_kelly = max(0.0, ((W - ((1 - W) / R)) / 4) * 100)
+# --- SIZING GUIDE (now grounded in this instance's own empirical Track
+# Record instead of a formula that treated an unrelated technical score as a
+# win probability). See compute_sizing_guide() in the backend: it uses the
+# ACTUAL win rate and average win/loss size observed historically for Swing
+# readings like the current one, and openly says "not enough data yet"
+# rather than showing a number nobody can act on. ---
+sizing = telemetry.get("sizing_guide", {})
+sizing_bucket = sizing.get("current_bucket", "neutral").title()
+if sizing.get("available"):
+    kelly_display = f"{sizing['quarter_kelly_pct']:.2f}%"
+    sizing_help = (
+        f"Based on {sizing['sample_size']} historical Swing-{sizing_bucket} readings on this instance: "
+        f"{sizing['win_rate_pct']:.0f}% ended positive, avg win +{sizing['avg_win_pct']:.2f}%, "
+        f"avg loss -{sizing['avg_loss_pct']:.2f}%. Quarter-Kelly of that edge is shown. Still a small, "
+        f"instance-specific sample, not a professionally validated figure -- not investment advice."
+    )
 else:
-    quarter_kelly = 0.0
-kelly_display = f"~{quarter_kelly:.2f}%*"
+    n = sizing.get("sample_size", 0)
+    min_n = sizing.get("min_sample_size", 20)
+    kelly_display = f"Collecting ({n}/{min_n})"
+    sizing_help = (
+        f"Not enough history yet for Swing-{sizing_bucket} readings to estimate a real edge "
+        f"({n} of {min_n} needed). Check the Track Record section below, or come back once more "
+        f"readings like this one have accumulated."
+    )
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
+
 
     pl1, pl2 = st.columns(2)
     dxy_raw = plumbing.get("dxy", {})
@@ -259,16 +276,28 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 # SECTION 1: LIVE MARKET OVERVIEW
 # ==========================================
 render_header("📊 Live Market Overview")
+deltas = telemetry.get("deltas", {})
 with st.container(border=True):
     ov_r1c1, ov_r1c2, ov_r1c3 = st.columns(3)
-    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
-    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+    spot_delta = deltas.get("spot_pct_24h")
+    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
+                    delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
+    rsi_delta = deltas.get("rsi_1h")
+    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}",
+                    delta=f"{rsi_delta:+.1f} (1h)" if rsi_delta is not None else None,
+                    help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
+    vwap_delta = deltas.get("vwap_1h_pct")
+    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
+                    delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
+                    help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
 
     ov_r2c1, ov_r2c2 = st.columns(2)
-    ov_r2c1.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
-    ov_r2c2.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
-    st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
+    oi_delta = deltas.get("oi_1h_pct")
+    ov_r2c1.metric("Open Interest", OPEN_INTEREST,
+                    delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
+                    help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
+    ov_r2c2.metric("Sizing Guide*", kelly_display, help=sizing_help)
+    st.caption("*Sizing Guide is based on this instance's own Track Record (empirical win rate and avg win/loss for the current Swing bias bucket) via quarter-Kelly — not a formula-derived guess. Still a small, instance-specific sample; not investment advice.")
 
 if "🟢" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bullish")
 elif "🔴" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bearish")
