@@ -12,7 +12,7 @@ st.set_page_config(page_title="Quant Desk Multi-Timeframe Terminal", page_icon="
 # --- CUSTOM CSS ---
 st.markdown("""
 <style>
-[data-testid="stMetricValue"] { font-size: 1.4rem !important; }
+[data-testid="stMetricValue"] { font-size: 1.25rem !important; }
 [data-testid="stMetricLabel"] { font-size: 0.90rem !important; white-space: normal !important; color: #8892B0 !important; }
 [data-testid="stMetricDelta"] { font-size: 0.85rem !important; }
 table { width: 100%; border-collapse: collapse; }
@@ -233,14 +233,20 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 # SECTION 1: LIVE MARKET OVERVIEW
 # ==========================================
 render_header("📊 Live Market Overview")
-m1, m2, m3, m4, m5, m6 = st.columns(6)
-m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-m2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
-m3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
-m4.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
-m5.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
-m6.metric("Overall Bias", exec_gate)
+ov_r1c1, ov_r1c2, ov_r1c3 = st.columns(3)
+ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
+ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
+ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+
+ov_r2c1, ov_r2c2 = st.columns(2)
+ov_r2c1.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
+ov_r2c2.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
 st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
+
+if "🟢" in exec_gate: st.success(f"**Overall Bias:** {exec_gate}")
+elif "🔴" in exec_gate: st.error(f"**Overall Bias:** {exec_gate}")
+elif "⚠️" in exec_gate or "🟡" in exec_gate: st.warning(f"**Overall Bias:** {exec_gate}")
+else: st.info(f"**Overall Bias:** {exec_gate}")
 
 # ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX
@@ -380,15 +386,13 @@ if insights or telemetry:
 # SECTION 4: RISK GATEWAY
 # ==========================================
 render_header("🛡️ Desk-Level Risk Gateway")
-rg1, rg2, rg3, rg4 = st.columns(4)
 
 blended_risk = round(((macro_score * 10) + swing_score + micro_score) / 3, 1)
 
-clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
-rg1.metric("Risk Base Score", f"{blended_risk} / 100")
-rg2.metric("Bias Summary", clean_directive)
-rg3.metric("Upper Liq Wall", f"${upper_wall:,.0f}")
-rg4.metric("Lower Liq Wall", f"${lower_wall:,.0f}")
+rg1, rg2, rg3 = st.columns(3)
+rg1.metric("Risk Base Score", f"{blended_risk} / 100", help="Blended read across all three tiers (macro ×10, swing, micro, averaged). Higher = more bullish composite.")
+rg2.metric("Upper Liq Wall", f"${upper_wall:,.0f}", help="Nearest large resting sell-side liquidity cluster above spot.")
+rg3.metric("Lower Liq Wall", f"${lower_wall:,.0f}", help="Nearest large resting buy-side liquidity cluster below spot.")
 
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
@@ -423,21 +427,41 @@ else:
                 if z_max <= 0:
                     z_max = 10.0
 
+                # Brand-matched teal gradient (near-black -> navy -> teal -> near-white)
+                # instead of a rainbow scale, so heavier liquidity clusters read as
+                # brighter/hotter without the visual noise of a multi-hue palette.
+                teal_colorscale = [
+                    [0.0, "#0A0E17"],
+                    [0.20, "#0F2A3D"],
+                    [0.45, "#0E7490"],
+                    [0.70, "#00C2CC"],
+                    [0.88, "#26FFDE"],
+                    [1.0, "#F0FFFC"],
+                ]
+
+                # Thin the x-axis ticks so 30 snapshot labels don't crowd the axis.
+                tick_idx = list(range(0, len(time_steps), 5)) if time_steps else []
+                tick_vals = [time_steps[i] for i in tick_idx]
+
                 fig_heatmap = go.Figure(data=go.Heatmap(
                     z=z_array, x=time_steps if time_steps else None, y=prices if prices else None,
-                    colorscale='Turbo', showscale=True, zmin=0.0, zmax=z_max, zsmooth='best',
-                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
+                    colorscale=teal_colorscale, showscale=True, zmin=0.0, zmax=z_max,
+                    zsmooth=False,  # crisp cells -- smoothing blurred zero/real-value boundaries
+                    hovertemplate="Price: $%{y:,.0f}<br>Depth: %{z:.2f}<br>%{x}<extra></extra>",
+                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0")),
+                    xgap=1, ygap=1,  # thin gaps between cells read as a grid, not a blob
                 ))
                 fig_heatmap.update_layout(
-                    height=480, margin=dict(l=0, r=0, t=10, b=0), template="plotly_dark",
+                    height=520, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
-                    xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
+                    yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0"), automargin=True),
+                    xaxis=dict(title=dict(text="Snapshots (Older → Newer)", font=dict(color="#8892B0")), showgrid=False, tickfont=dict(color="#8892B0"), tickmode="array", tickvals=tick_vals, ticktext=tick_vals, automargin=True),
                 )
-                fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
-                fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
+                fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1.5, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=11))
+                fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1.5, annotation_text="Lower Support", annotation_font=dict(color="#00E676", size=11))
+                fig_heatmap.add_hline(y=LIVE_SPOT_PRICE, line_dash="solid", line_color="#F5F5F5", line_width=1, opacity=0.55, annotation_text="Spot", annotation_font=dict(color="#F5F5F5", size=11), annotation_position="left")
                 st.plotly_chart(fig_heatmap, use_container_width=True)
-                st.caption("Price axis is now a fixed grid that only shifts when spot trades outside it (history resets on shift), so columns stay aligned to the labeled prices.")
+                st.caption("Price axis is a fixed grid that only shifts when spot trades outside it (history resets on shift). Cells are shown unsmoothed so bucket boundaries stay accurate.")
             except Exception:
                 st.info("🗺️ Heatmap rendering matrix...")
         else:
