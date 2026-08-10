@@ -58,15 +58,35 @@ plumbing = telemetry.get("macro_plumbing", {
 })
 insights = telemetry.get("insights", {})
 
-# --- TIERED EXECUTION GATE LOGIC ---
+# --- BIAS + CONFIDENCE (educational framing: state the bias and how far it
+# is from neutral, never an instruction to act) ---
+def confidence_label(score, neutral, scale):
+    distance = abs(score - neutral) / scale
+    if distance < 0.15:
+        return "Low"
+    elif distance < 0.35:
+        return "Moderate"
+    return "High"
+
+macro_conf = confidence_label(macro_score, 5.0, 5.0)
+swing_conf = confidence_label(swing_score, 50.0, 50.0)
+micro_conf = confidence_label(micro_score, 50.0, 50.0)
+
 macro_bull, macro_bear = macro_score >= 5.5, macro_score <= 4.5
-if macro_bull and micro_score <= 45.0: exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐂 / MICRO 🐻)"
-elif macro_bear and micro_score >= 55.0: exec_gate = "⚠️ COUNTER-TREND TRAP (MACRO 🐻 / MICRO 🐂)"
-elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0: exec_gate = "🟢 FULL DEPLOY (LONG)"
-elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0: exec_gate = "🔴 FULL DEPLOY (SHORT)"
-elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0: exec_gate = "🟡 TACTICAL HEDGE (SHORT PULLBACK)"
-elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0: exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
-else: exec_gate = "⏳ SCALP ONLY / STAND DOWN"
+if macro_bull and micro_score <= 45.0:
+    exec_gate = "⚠️ Conflicting Bias — Macro Bullish, Micro Bearish (Diverging Timeframes)"
+elif macro_bear and micro_score >= 55.0:
+    exec_gate = "⚠️ Conflicting Bias — Macro Bearish, Micro Bullish (Diverging Timeframes)"
+elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
+    exec_gate = f"🟢 Bullish Bias — Aligned Across Timeframes ({macro_conf} Confidence)"
+elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0:
+    exec_gate = f"🔴 Bearish Bias — Aligned Across Timeframes ({macro_conf} Confidence)"
+elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
+    exec_gate = "🟡 Bullish Macro, Bearish Near-Term (Possible Pullback)"
+elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
+    exec_gate = "🟡 Bearish Macro, Bullish Near-Term (Possible Bounce)"
+else:
+    exec_gate = "⏳ No Clear Bias — Mixed Signals (Low Confidence)"
 
 # --- HEURISTIC SIZING GUIDE (formerly labeled "Kelly Criterion") ---
 # swing_score is an unbacktested composite technical score, not a calibrated
@@ -147,7 +167,7 @@ with st.sidebar:
 header_col1, header_col2 = st.columns([5, 1])
 with header_col1:
     st.markdown("<h2 style='margin-bottom:0;'>⚡ QUANT DESK TERMINAL</h2>", unsafe_allow_html=True)
-    st.caption("Institutional Decision Matrix & Execution Gateway")
+    st.caption("Multi-Timeframe Bias & Signal Dashboard")
 with header_col2:
     with st.popover("⚙️ Settings"):
         st.markdown("**API Connection**")
@@ -196,17 +216,30 @@ else:
 def render_header(title):
     st.markdown(f"<h4 style='color: #E0E0E0; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 40px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;'>{title}</h4>", unsafe_allow_html=True)
 
+with st.expander("📖 Glossary — What These Terms Mean"):
+    st.markdown("""
+- **RSI (Relative Strength Index)**: measures how fast and how far price has moved recently, on a 0–100 scale. Above ~70 is often called "overbought," below ~30 "oversold" — but in a strong trend it can stay extreme for a while, so it's a momentum gauge, not a timing signal on its own.
+- **VWAP (Volume-Weighted Average Price)**: the average price paid so far this session, weighted by how much volume traded at each price. Traders use it as a reference line — price above VWAP is generally read as buyers in control, below as sellers in control.
+- **Funding Rate**: a periodic payment between long and short perpetual-futures traders that keeps the futures price tethered to spot. Persistently positive funding means longs are paying shorts (crowded long positioning); negative means the reverse.
+- **Open Interest (OI)**: the total number of outstanding futures/options contracts that haven't been closed. Rising OI alongside a price move suggests new money entering the trend; falling OI suggests positions closing out.
+- **CVD (Cumulative Volume Delta)**: running total of aggressive buy volume minus aggressive sell volume. Positive CVD means market buy orders are outweighing market sells.
+- **Liquidity Heatmap / Order Book Walls**: visualizes where large buy or sell orders are sitting in the order book. Thick clusters ("walls") are levels the market has to absorb to keep moving through.
+- **Implied Volatility (IV) Skew**: how options-market-priced volatility differs across strike prices for a given expiry. A steep skew toward downside strikes usually reflects more hedging demand against a drop.
+- **Volume Profile (POC / VAH / VAL)**: POC (Point of Control) is the price level with the most traded volume; VAH/VAL (Value Area High/Low) bound the range where most volume traded. These are reference levels, not predictions.
+- **On-Chain Exchange Flows**: BTC moving onto or off exchanges. Net outflow is often read as accumulation (moving to cold storage); net inflow as potential selling pressure.
+""")
+
 # ==========================================
 # SECTION 1: LIVE MARKET OVERVIEW
 # ==========================================
 render_header("📊 Live Market Overview")
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-m2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}")
-m3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}")
-m4.metric("Open Interest", OPEN_INTEREST)
+m2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}", help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
+m3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}", help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+m4.metric("Open Interest", OPEN_INTEREST, help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
 m5.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
-m6.metric("Execution Gate", exec_gate)
+m6.metric("Overall Bias", exec_gate)
 st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
 
 # ==========================================
@@ -218,9 +251,9 @@ col_macro, col_swing, col_micro = st.columns(3)
 with col_macro:
     st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
     st.caption("Blends DXY, 10Y yield, VIX, S&P 500, plus BTC's own trend.")
-    if macro_score >= 5.5: st.success("Directive: LONG (🐂 BULL EXPANSION)")
-    elif macro_score <= 4.5: st.error("Directive: SHORT (🐻 BEAR CONTRACTION)")
-    else: st.warning("Directive: ⏳ NEUTRAL / CHOP")
+    if macro_score >= 5.5: st.success(f"Bias: Bullish 🐂 ({macro_conf} Confidence)")
+    elif macro_score <= 4.5: st.error(f"Bias: Bearish 🐻 ({macro_conf} Confidence)")
+    else: st.warning(f"Bias: Neutral / Choppy ({macro_conf} Confidence)")
 
     ma_setups = setups.get("macro", {})
     st.markdown(f"""
@@ -238,9 +271,9 @@ with col_macro:
 with col_swing:
     st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
     st.caption("Blends 24h price change, VWAP divergence, and funding rate.")
-    if swing_score >= 52.0: st.success("Directive: TACTICAL LONG RALLY")
-    elif swing_score <= 48.0: st.error("Directive: TACTICAL LIQUIDATION WAVE")
-    else: st.warning("Directive: ⏳ CHOP / NO TRADE")
+    if swing_score >= 52.0: st.success(f"Bias: Bullish ({swing_conf} Confidence)")
+    elif swing_score <= 48.0: st.error(f"Bias: Bearish ({swing_conf} Confidence)")
+    else: st.warning(f"Bias: Neutral / Choppy ({swing_conf} Confidence)")
 
     sw_setups = setups.get("tactical", {})
     st.markdown(f"""
@@ -260,9 +293,9 @@ with col_micro:
     st.caption("Blends RSI(14) momentum and VWAP divergence.")
     micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
 
-    if "🟢" in micro_dir: st.success(f"Directive: {micro_dir}")
-    elif "🔴" in micro_dir: st.error(f"Directive: {micro_dir}")
-    else: st.warning(f"Directive: {micro_dir}")
+    if "🟢" in micro_dir: st.success(f"Bias: {micro_dir}")
+    elif "🔴" in micro_dir: st.error(f"Bias: {micro_dir}")
+    else: st.warning(f"Bias: {micro_dir}")
 
     mi_setups = setups.get("micro", {})
     st.markdown(f"""
@@ -278,10 +311,60 @@ with col_micro:
     st.caption(f"**Rationale:** {micro_rat}")
 
 # ==========================================
-# SECTION 3: PLAYBOOK MANIFESTO
+# TRACK RECORD — does this signal actually work?
+# ==========================================
+@st.cache_data(ttl=300)
+def get_track_record():
+    try:
+        r = requests.get(f"{API_URL}/track-record", timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return {}
+
+track_record = get_track_record()
+
+render_header("📈 Track Record — Does This Signal Actually Work?")
+if not track_record or not track_record.get("tracking_since"):
+    st.info("No historical data logged yet. This instance just started tracking scores against what price actually did afterward — check back once it's had time to accumulate readings.")
+else:
+    try:
+        since_dt = datetime.fromisoformat(track_record["tracking_since"].replace("Z", "+00:00"))
+        since_label = since_dt.strftime("%b %d, %Y")
+    except Exception:
+        since_label = track_record["tracking_since"]
+    st.caption(f"Tracking since {since_label} · minimum sample size for a reading to be shown as reliable: {track_record.get('min_sample_size', 20)}")
+
+    tr_cols = st.columns(3)
+    tier_meta = [
+        ("macro", "🌐 Macro", tr_cols[0]),
+        ("swing", "🔴 Swing", tr_cols[1]),
+        ("micro", "🎯 Micro", tr_cols[2]),
+    ]
+    for tier_key, tier_label, col in tier_meta:
+        with col:
+            tier_data = track_record.get("tiers", {}).get(tier_key, {})
+            horizon = tier_data.get("horizon", "")
+            st.markdown(f"**{tier_label}** · {horizon} forward return")
+            buckets = tier_data.get("buckets", {})
+            for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
+                b = buckets.get(bucket_key, {})
+                n = b.get("n", 0)
+                if not b.get("sufficient_sample"):
+                    st.caption(f"{bucket_label}: n={n} — still collecting (need {track_record.get('min_sample_size', 20)})")
+                else:
+                    avg_r = b.get("avg_return_pct")
+                    pct_pos = b.get("pct_positive")
+                    sign = "+" if avg_r is not None and avg_r >= 0 else ""
+                    st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n}")
+    st.caption(track_record.get("caveat", ""))
+
+# ==========================================
+# SECTION 3: SIGNAL SUMMARY
 # ==========================================
 if insights or telemetry:
-    render_header("📜 Playbook Manifesto")
+    render_header("📜 Signal Summary")
 
     if "🟢" in exec_gate: playbook_color = st.success
     elif "🔴" in exec_gate: playbook_color = st.error
@@ -290,7 +373,7 @@ if insights or telemetry:
 
     dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
     safe_guidance = insights.get('institutional_guidance', 'N/A')
-    playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {safe_guidance}")
+    playbook_color(f"**🛡️ GUIDANCE:** {safe_guidance}")
     playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
 
 # ==========================================
@@ -303,7 +386,7 @@ blended_risk = round(((macro_score * 10) + swing_score + micro_score) / 3, 1)
 
 clean_directive = exec_gate.split(" ", 1)[1] if " " in exec_gate else exec_gate
 rg1.metric("Risk Base Score", f"{blended_risk} / 100")
-rg2.metric("Desk Directive", clean_directive)
+rg2.metric("Bias Summary", clean_directive)
 rg3.metric("Upper Liq Wall", f"${upper_wall:,.0f}")
 rg4.metric("Lower Liq Wall", f"${lower_wall:,.0f}")
 
@@ -316,9 +399,10 @@ if not telemetry:
 else:
     session_info = telemetry.get("session_cvd", {})
     sc1, sc2, sc3 = st.columns(3)
-    with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""))
-    with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""))
-    with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
+    cvd_help = "Cumulative Volume Delta: running total of aggressive buy volume minus sell volume for this session. Positive means market buys are outweighing market sells."
+    with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""), help=cvd_help)
+    with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""), help=cvd_help)
+    with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""), help=cvd_help)
     st.caption("Known limitation: sessions are bucketed by hour-of-day across a rolling 24h window, so whichever session is currently in progress shows a partial read rather than a full prior session. Not yet fixed — flagged here rather than presented as directly comparable.")
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -385,9 +469,9 @@ else:
     st.markdown("**⛓️ On-Chain Exchange Flows**")
     oc_data = telemetry.get("onchain_flows", {})
     oc1, oc2, oc3 = st.columns(3)
-    with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption")
-    with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power")
-    with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"))
+    with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption", help="BTC moving onto (positive) or off (negative) exchanges. Net outflow is often read as accumulation.")
+    with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power", help="New stablecoin issuance, often watched as a proxy for fresh buying power entering crypto markets.")
+    with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"), help="Direction of total BTC held on exchanges. A declining trend is generally read as coins moving to longer-term holding.")
 
 # ==========================================
 # SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
@@ -409,12 +493,15 @@ if insights:
             st.write(f"- {cat}")
 
     with guide_col:
-        st.markdown("**🧭 Desk-Level Action Plan**")
-        raw_action = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
+        st.markdown("**🧭 Signal Interpretation**")
+        raw_action = insights.get("action_plan", "Scores are near neutral across timeframes right now.")
         action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
-        if "TRAP" in action_plan_clean:
+        tone = insights.get("action_plan_tone", "neutral")
+        if tone == "conflict":
             st.error(action_plan_clean)
-        elif "favorable" in action_plan_clean or "Bullish" in action_plan_clean:
+        elif tone == "bullish":
             st.success(action_plan_clean)
-        else:
+        elif tone == "bearish":
             st.warning(action_plan_clean)
+        else:
+            st.info(action_plan_clean)
