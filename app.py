@@ -290,7 +290,7 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     viz_col1, viz_col2 = st.columns([2, 1])
     
-   with viz_col1:
+    with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
         
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
