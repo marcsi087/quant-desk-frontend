@@ -277,18 +277,32 @@ rg4.metric("Lower Liq Wall", f"${lower_wall:,.0f}")
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
 # ==========================================
+# ==========================================
+# SECTION 5: TELEMETRY & CHARTS
+# ==========================================
 render_header("🔬 Telemetry & Liquidity")
 if not telemetry:
     st.error("⚠️ Backend API is currently unreachable. Retrying in 30 seconds...")
 else:
     session_info = telemetry.get("session_cvd", {})
     sc1, sc2, sc3 = st.columns(3)
-    with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""))
-    with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""))
-    with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
+    with sc1: 
+        st.metric(session_info.get("asia", {}).get("name", "Asia Open"), 
+                  session_info.get("asia", {}).get("cvd", "N/A"), 
+                  session_info.get("asia", {}).get("delta", ""))
+    with sc2: 
+        st.metric(session_info.get("london", {}).get("name", "London Open"), 
+                  session_info.get("london", {}).get("cvd", "N/A"), 
+                  session_info.get("london", {}).get("delta", ""))
+    with sc3: 
+        st.metric(session_info.get("new_york", {}).get("name", "NY Open"), 
+                  session_info.get("new_york", {}).get("cvd", "N/A"), 
+                  session_info.get("new_york", {}).get("delta", ""))
     
     st.markdown("<br>", unsafe_allow_html=True)
-       viz_col1, viz_col2 = st.columns([2, 1])
+    
+    # ↓↓↓ This line must be at the SAME indentation level as the lines above it (inside the else)
+    viz_col1, viz_col2 = st.columns([2, 1])
     
     with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
@@ -374,7 +388,8 @@ else:
                 st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
         else:
             st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
-        
+
+    # These two lines should also be inside the else block, at the same level as viz_col1
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("**⛓️ On-Chain Exchange Flows**")
     oc_data = telemetry.get("onchain_flows", {})
