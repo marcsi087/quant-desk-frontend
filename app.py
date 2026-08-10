@@ -253,7 +253,7 @@ with header_col2:
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**🔬 Factor Research**")
-        st.caption("Tests each raw input (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P) against real forward returns, independently — this is what finds real edge instead of testing pre-bundled, hand-weighted composite scores. Read-only: never changes the live formulas by itself.")
+        st.caption("Tests each raw input against real forward returns, independently — now 14 features: the original 8 (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P) plus order-flow imbalance, 3/7/14-day momentum, and volatility regime, added to give Swing and Macro's own horizons a fairer test. Read-only: never changes the live formulas by itself.")
         fr_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="fr_months")
         if st.button("Run Factor Research"):
             with st.spinner("Reconstructing feature history and testing correlations — this can take a minute..."):
@@ -350,7 +350,7 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 - **Liquidity Heatmap / Order Book Walls**: visualizes where large buy or sell orders are sitting in the order book. Thick clusters ("walls") are levels the market has to absorb to keep moving through.
 - **Implied Volatility (IV) Skew**: how options-market-priced volatility differs across strike prices for a given expiry. A steep skew toward downside strikes usually reflects more hedging demand against a drop.
 - **Volume Profile (POC / VAH / VAL)**: POC (Point of Control) is the price level with the most traded volume; VAH/VAL (Value Area High/Low) bound the range where most volume traded. These are reference levels, not predictions.
-- **On-Chain Exchange Flows**: BTC moving onto or off exchanges. Net outflow is often read as accumulation (moving to cold storage); net inflow as potential selling pressure.
+- **Network Activity**: real, live Bitcoin network data (mempool backlog, fee pressure) — a proxy for on-chain demand, not exchange-specific buying/selling flow (that requires a paid data provider this app doesn't currently use).
 """)
 
 # ==========================================
@@ -705,13 +705,14 @@ else:
             st.info("📉 Volatility Skew surface loading...")
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**⛓️ On-Chain Exchange Flows**")
-    oc_data = telemetry.get("onchain_flows", {})
+    st.markdown("**⛓️ Network Activity**")
+    net_data = telemetry.get("network_activity", {})
     with st.container(border=True):
-        oc1, oc2, oc3 = st.columns(3)
-        with oc1: st.metric("24H Net Exchange Flow", oc_data.get("btc_netflow_24h", "N/A"), "Cold Storage Absorption", help="BTC moving onto (positive) or off (negative) exchanges. Net outflow is often read as accumulation.")
-        with oc2: st.metric("24H Stablecoin Mint", oc_data.get("stablecoin_mint_24h", "N/A"), "Purchasing Power", help="New stablecoin issuance, often watched as a proxy for fresh buying power entering crypto markets.")
-        with oc3: st.metric("Global Reserve Trend", oc_data.get("exchange_reserve_trend", "N/A"), help="Direction of total BTC held on exchanges. A declining trend is generally read as coins moving to longer-term holding.")
+        nc1, nc2, nc3 = st.columns(3)
+        with nc1: st.metric("Fastest Fee", f"{net_data.get('fastest_fee_satvb', 'N/A')} sat/vB", help="Real, live data from mempool.space. Fee needed for next-block confirmation -- a rough proxy for how much on-chain demand is competing for block space right now.")
+        with nc2: st.metric("Mempool Backlog", f"{net_data.get('mempool_tx_count', 'N/A'):,}" if isinstance(net_data.get('mempool_tx_count'), int) else "N/A", help="Unconfirmed transactions waiting in the mempool. A growing backlog means more on-chain activity than the network can immediately clear.")
+        with nc3: st.metric("Congestion", net_data.get("congestion_label", "N/A"))
+        st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
 
 # ==========================================
 # SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
