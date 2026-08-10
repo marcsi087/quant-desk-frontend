@@ -288,97 +288,92 @@ else:
     with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
     
     st.markdown("<br>", unsafe_allow_html=True)
-    viz_col1, viz_col2 = st.columns([2, 1])
+       viz_col1, viz_col2 = st.columns([2, 1])
     
     with viz_col1:
-    st.markdown("**🗺️ Order Book Liquidity Heatmap**")
-    
-    z_matrix = hm_data.get("z_matrix", []) if hm_data else []
-    
-    # Safer validity check
-    has_valid_data = (
-        isinstance(z_matrix, list) 
-        and len(z_matrix) > 0 
-        and all(isinstance(row, (list, tuple, np.ndarray)) for row in z_matrix)
-        and any(any(bool(v) for v in row) for row in z_matrix)
-    )
+        st.markdown("**🗺️ Order Book Liquidity Heatmap**")
+        
+        z_matrix = hm_data.get("z_matrix", []) if hm_data else []
+        has_valid_data = (
+            isinstance(z_matrix, list) 
+            and len(z_matrix) > 0 
+            and all(isinstance(row, (list, tuple, np.ndarray)) for row in z_matrix)
+            and any(any(bool(v) for v in row) for row in z_matrix)
+        )
 
-    if hm_data and has_valid_data:
-        try:
-            z_array = np.asarray(z_matrix, dtype=float)
-            
-            # Ensure 2D
-            if z_array.ndim != 2:
-                raise ValueError("z_matrix must be 2-dimensional")
-            
-            time_steps = hm_data.get("time_steps", [])
-            prices = hm_data.get("prices", [])
-            
-            # Optional but recommended: shape sanity
-            if len(prices) != z_array.shape[0] or (time_steps and len(time_steps) != z_array.shape[1]):
-                st.warning("Heatmap axis length mismatch – rendering without custom axes.")
-                time_steps = None
-                prices = None
+        if hm_data and has_valid_data:
+            try:
+                z_array = np.asarray(z_matrix, dtype=float)
+                
+                if z_array.ndim != 2:
+                    raise ValueError("z_matrix must be 2-dimensional")
+                
+                time_steps = hm_data.get("time_steps", [])
+                prices = hm_data.get("prices", [])
+                
+                if len(prices) != z_array.shape[0] or (time_steps and len(time_steps) != z_array.shape[1]):
+                    st.warning("Heatmap axis length mismatch – rendering without custom axes.")
+                    time_steps = None
+                    prices = None
 
-            # Dynamic contrast
-            positive = z_array[z_array > 0]
-            if positive.size > 0:
-                z_min = float(np.percentile(positive, 5))
-                z_max = float(np.percentile(z_array, 95))
-            else:
-                z_min, z_max = 0.0, 15.0
-            
-            if z_min == z_max:
-                z_max = z_min + 1.0
+                positive = z_array[z_array > 0]
+                if positive.size > 0:
+                    z_min = float(np.percentile(positive, 5))
+                    z_max = float(np.percentile(z_array, 95))
+                else:
+                    z_min, z_max = 0.0, 15.0
+                
+                if z_min == z_max:
+                    z_max = z_min + 1.0
 
-            fig_heatmap = go.Figure(data=go.Heatmap(
-                z=z_array,
-                x=time_steps if time_steps else None,
-                y=prices if prices else None,
-                colorscale='Turbo',
-                showscale=True,
-                zmin=z_min,
-                zmax=z_max,
-                colorbar=dict(
-                    title=dict(text="Depth", font=dict(color="#8892B0")),
-                    thickness=12,
-                    len=0.8,
-                    tickfont=dict(color="#8892B0")
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=z_array,
+                    x=time_steps if time_steps else None,
+                    y=prices if prices else None,
+                    colorscale='Turbo',
+                    showscale=True,
+                    zmin=z_min,
+                    zmax=z_max,
+                    colorbar=dict(
+                        title=dict(text="Depth", font=dict(color="#8892B0")),
+                        thickness=12,
+                        len=0.8,
+                        tickfont=dict(color="#8892B0")
+                    )
+                ))
+                
+                fig_heatmap.update_layout(
+                    height=400,
+                    margin=dict(l=0, r=0, t=20, b=0),
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    yaxis=dict(
+                        title=dict(text="Spot Price ($)", font=dict(color="#8892B0")),
+                        tickformat="$,.0f",
+                        showgrid=True,
+                        gridcolor='rgba(255,255,255,0.05)',
+                        tickfont=dict(color="#8892B0")
+                    ),
+                    xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
                 )
-            ))
-            
-            fig_heatmap.update_layout(
-                height=400,
-                margin=dict(l=0, r=0, t=20, b=0),
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                yaxis=dict(
-                    title=dict(text="Spot Price ($)", font=dict(color="#8892B0")),
-                    tickformat="$,.0f",
-                    showgrid=True,
-                    gridcolor='rgba(255,255,255,0.05)',
-                    tickfont=dict(color="#8892B0")
-                ),
-                xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
-            )
-            
-            fig_heatmap.add_hline(
-                y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
-                annotation_text="Upper Wall", annotation_font=dict(color="#FF3366")
-            )
-            fig_heatmap.add_hline(
-                y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
-                annotation_text="Lower Support", annotation_font=dict(color="#00E676")
-            )
-            
-            st.plotly_chart(fig_heatmap, use_container_width=True)
-            
-        except Exception as e:
-            st.warning(f"Heatmap render failed: {e}")
+                
+                fig_heatmap.add_hline(
+                    y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
+                    annotation_text="Upper Wall", annotation_font=dict(color="#FF3366")
+                )
+                fig_heatmap.add_hline(
+                    y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
+                    annotation_text="Lower Support", annotation_font=dict(color="#00E676")
+                )
+                
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+                
+            except Exception as e:
+                st.warning(f"Heatmap render failed: {e}")
+                st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
+        else:
             st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
-    else:
-        st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
         
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("**⛓️ On-Chain Exchange Flows**")
