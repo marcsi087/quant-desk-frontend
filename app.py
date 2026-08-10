@@ -317,14 +317,16 @@ else:
                     z_max = z_min + 1.0
 
                 fig_heatmap = go.Figure(data=go.Heatmap(
-                    z=z_array, 
-                    x=time_steps if time_steps else None, 
+                    z=z_array,
+                    x=time_steps if time_steps else None,
                     y=prices if prices else None,
-                    colorscale='Turbo', 
+                    colorscale='Turbo',
                     showscale=True,
-                    zmin=z_min, 
+                    zmin=z_min,
                     zmax=z_max,
-                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
+                    zsmooth='best',  # <-- This triggers the continuous gradient interpolation
+                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0")
+                    )
                 ))
                 fig_heatmap.update_layout(
                     height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
