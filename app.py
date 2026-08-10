@@ -437,7 +437,7 @@ with col_swing:
 with col_micro:
     with st.container(border=True):
         st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-        st.caption("Blends RSI(14) momentum and VWAP divergence.")
+        st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon.")
         micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
 
         if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
