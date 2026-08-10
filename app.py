@@ -362,9 +362,12 @@ if insights:
         for cat in insights.get("catalysts", []): 
             st.write(f"- {cat}")
             
-    with guide_col:
+   with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
-        action_plan_clean = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
+        raw_action = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
+        # Strip out any lingering markdown asterisk/formatting corruption from JSON transfer
+        action_plan_clean = raw_action.replace("*", "").replace("  ", " ")
+        
         if "TRAP" in action_plan_clean: st.error(action_plan_clean)
         elif "favorable" in action_plan_clean: st.success(action_plan_clean)
         else: st.warning(action_plan_clean)
