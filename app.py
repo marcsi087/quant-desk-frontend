@@ -280,116 +280,86 @@ rg4.metric("Lower Liq Wall", f"${lower_wall:,.0f}")
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
 # ==========================================
+# ==========================================
+# SECTION 5: TELEMETRY & CHARTS
+# ==========================================
 render_header("🔬 Telemetry & Liquidity")
 if not telemetry:
     st.error("⚠️ Backend API is currently unreachable. Retrying in 30 seconds...")
 else:
     session_info = telemetry.get("session_cvd", {})
     sc1, sc2, sc3 = st.columns(3)
-    with sc1: 
-        st.metric(session_info.get("asia", {}).get("name", "Asia Open"), 
-                  session_info.get("asia", {}).get("cvd", "N/A"), 
-                  session_info.get("asia", {}).get("delta", ""))
-    with sc2: 
-        st.metric(session_info.get("london", {}).get("name", "London Open"), 
-                  session_info.get("london", {}).get("cvd", "N/A"), 
-                  session_info.get("london", {}).get("delta", ""))
-    with sc3: 
-        st.metric(session_info.get("new_york", {}).get("name", "NY Open"), 
-                  session_info.get("new_york", {}).get("cvd", "N/A"), 
-                  session_info.get("new_york", {}).get("delta", ""))
+    with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""))
+    with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""))
+    with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # ↓↓↓ This line must be at the SAME indentation level as the lines above it (inside the else)
     viz_col1, viz_col2 = st.columns([2, 1])
     
     with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
-        
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
-        has_valid_data = (
-            isinstance(z_matrix, list) 
-            and len(z_matrix) > 0 
-            and all(isinstance(row, (list, tuple, np.ndarray)) for row in z_matrix)
-            and any(any(bool(v) for v in row) for row in z_matrix)
-        )
-
-        if hm_data and has_valid_data:
+        
+        if len(z_matrix) > 0:
             try:
-                z_array = np.asarray(z_matrix, dtype=float)
-                
-                if z_array.ndim != 2:
-                    raise ValueError("z_matrix must be 2-dimensional")
-                
+                z_array = np.array(z_matrix, dtype=float)
                 time_steps = hm_data.get("time_steps", [])
                 prices = hm_data.get("prices", [])
                 
-                if len(prices) != z_array.shape[0] or (time_steps and len(time_steps) != z_array.shape[1]):
-                    st.warning("Heatmap axis length mismatch – rendering without custom axes.")
-                    time_steps = None
-                    prices = None
-
-                positive = z_array[z_array > 0]
-                if positive.size > 0:
-                    z_min = float(np.percentile(positive, 5))
+                # Robust min/max fallback scaling for Turbo color gradient
+                valid_vals = z_array[z_array > 0]
+                if valid_vals.size > 0:
+                    z_min = float(np.percentile(valid_vals, 5))
                     z_max = float(np.percentile(z_array, 95))
                 else:
-                    z_min, z_max = 0.0, 15.0
-                
-                if z_min == z_max:
+                    z_min, z_max = 0.0, 10.0
+                if z_min >= z_max:
                     z_max = z_min + 1.0
 
                 fig_heatmap = go.Figure(data=go.Heatmap(
-                    z=z_array,
-                    x=time_steps if time_steps else None,
+                    z=z_array, 
+                    x=time_steps if time_steps else None, 
                     y=prices if prices else None,
-                    colorscale='Turbo',
+                    colorscale='Turbo', 
                     showscale=True,
-                    zmin=z_min,
+                    zmin=z_min, 
                     zmax=z_max,
-                    colorbar=dict(
-                        title=dict(text="Depth", font=dict(color="#8892B0")),
-                        thickness=12,
-                        len=0.8,
-                        tickfont=dict(color="#8892B0")
-                    )
+                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
                 ))
-                
                 fig_heatmap.update_layout(
-                    height=400,
-                    margin=dict(l=0, r=0, t=20, b=0),
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    yaxis=dict(
-                        title=dict(text="Spot Price ($)", font=dict(color="#8892B0")),
-                        tickformat="$,.0f",
-                        showgrid=True,
-                        gridcolor='rgba(255,255,255,0.05)',
-                        tickfont=dict(color="#8892B0")
-                    ),
+                    height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0")),
                     xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"))
                 )
-                
-                fig_heatmap.add_hline(
-                    y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
-                    annotation_text="Upper Wall", annotation_font=dict(color="#FF3366")
-                )
-                fig_heatmap.add_hline(
-                    y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
-                    annotation_text="Lower Support", annotation_font=dict(color="#00E676")
-                )
-                
+                fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
+                fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
                 st.plotly_chart(fig_heatmap, use_container_width=True)
-                
             except Exception as e:
-                st.warning(f"Heatmap render failed: {e}")
-                st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
+                st.info("🗺️ Heatmap rendering matrix...")
         else:
             st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
 
-    # These two lines should also be inside the else block, at the same level as viz_col1
+    with viz_col2:
+        st.markdown("**📉 Deribit Volatility Skew**")
+        vs_data = telemetry.get("volatility_skew", {})
+        strike_vals = vs_data.get("strikes", [])
+        iv_vals = vs_data.get("iv_surface", [])
+        
+        if len(strike_vals) > 0 and len(iv_vals) > 0:
+            fig_skew = go.Figure()
+            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
+            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
+            fig_skew.update_layout(
+                height=400, margin=dict(l=0, r=0, t=20, b=0), template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0")),
+                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
+            )
+            st.plotly_chart(fig_skew, use_container_width=True)
+        else:
+            st.info("📉 Volatility Skew surface loading...")
+
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("**⛓️ On-Chain Exchange Flows**")
     oc_data = telemetry.get("onchain_flows", {})
