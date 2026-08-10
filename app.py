@@ -1,8 +1,8 @@
 import streamlit as st
-import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import requests
+from datetime import datetime, timezone
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURATION ---
@@ -18,6 +18,8 @@ st.markdown("""
 table { width: 100%; border-collapse: collapse; }
 th { color: #8892B0; font-size: 0.85rem; text-transform: uppercase; border-bottom: 1px solid #444 !important; }
 td { font-size: 0.95rem; border-bottom: 1px solid #222 !important; padding: 6px 0px !important; }
+.stale-badge { background-color: #3D2B00; color: #FFB020; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
+.live-badge { background-color: #0B3D24; color: #00E676; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -28,8 +30,11 @@ st_autorefresh(interval=60000, key="data_refresh")
 def get_telemetry():
     try:
         response = requests.get(f"{API_URL}/telemetry", timeout=10)
-        if response.status_code == 200: return response.json()
-    except: pass
+        if response.status_code == 200:
+            return response.json()
+        st.session_state["_fetch_error"] = f"Backend returned status {response.status_code}"
+    except Exception as e:
+        st.session_state["_fetch_error"] = f"Backend unreachable: {e}"
     return {}
 
 telemetry = get_telemetry()
@@ -39,16 +44,17 @@ LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
 FUNDING_RATE_PCT = FUNDING_RATE * 100
 OPEN_INTEREST = telemetry.get("open_interest", "$7.02B")
-ta = telemetry.get("ta", {"rsi": 58.0, "vwap": 63888.00, "atr_pct": 0.01})
-scores = telemetry.get("scores", {"macro": 6.2, "swing": 42.0, "micro": 50.0})
-macro_score = scores.get("macro", 6.2)
-swing_score = scores.get("swing", 42.0)
+ta = telemetry.get("ta", {"rsi": 50.0, "vwap": LIVE_SPOT_PRICE, "atr_pct": 0.01})
+scores = telemetry.get("scores", {"macro": 5.0, "swing": 50.0, "micro": 50.0})
+macro_score = scores.get("macro", 5.0)
+swing_score = scores.get("swing", 50.0)
 micro_score = scores.get("micro", 50.0)
 setups = telemetry.get("trade_setups", {})
+data_quality = telemetry.get("data_quality", {})
 
 plumbing = telemetry.get("macro_plumbing", {
-    "dxy": {"value": "104.20", "delta": "-0.15"}, "us10y": {"value": "4.250%", "delta": "+0.020"},
-    "vix": {"value": "14.50", "delta": "-0.50"}, "sp500": {"value": "5,200", "delta": "+45"}
+    "dxy": {"value": "104.20", "delta": "+0.00"}, "us10y": {"value": "4.250%", "delta": "+0.000"},
+    "vix": {"value": "14.50", "delta": "+0.00"}, "sp500": {"value": "5,200", "delta": "+0"}
 })
 insights = telemetry.get("insights", {})
 
@@ -62,53 +68,57 @@ elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0: exec_gate = "�
 elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0: exec_gate = "🟡 TACTICAL COUNTER (LONG BOUNCE)"
 else: exec_gate = "⏳ SCALP ONLY / STAND DOWN"
 
-# --- DYNAMIC KELLY CRITERION ---
+# --- HEURISTIC SIZING GUIDE (formerly labeled "Kelly Criterion") ---
+# swing_score is an unbacktested composite technical score, not a calibrated
+# win probability. Feeding it into a real Kelly formula would overstate
+# precision. Shown as an illustrative conviction gauge only -- NOT a
+# position-sizing recommendation -- until it's been validated against
+# realized forward returns.
 W = (swing_score / 100.0) if swing_score >= 50.0 else ((100.0 - swing_score) / 100.0)
 s_setups = setups.get("tactical", {})
 s_entry, s_t2, s_sl = s_setups.get('entry', LIVE_SPOT_PRICE), s_setups.get('t2', 62800.00), s_setups.get('sl', 65411.00)
 reward, risk = abs(s_entry - s_t2), abs(s_entry - s_sl)
-
 if risk > 0:
     R = reward / risk
     quarter_kelly = max(0.0, ((W - ((1 - W) / R)) / 4) * 100)
 else:
     quarter_kelly = 0.0
-kelly_display = f"{quarter_kelly:.2f}%"
+kelly_display = f"~{quarter_kelly:.2f}%*"
 
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
-    
+
     pl1, pl2 = st.columns(2)
     dxy_raw = plumbing.get("dxy", {})
     sp500_raw = plumbing.get("sp500", {})
     us10y_raw = plumbing.get("us10y", {})
     vix_raw = plumbing.get("vix", {})
-    
+
     dxy = dxy_raw if isinstance(dxy_raw, dict) else {"value": dxy_raw, "delta": "0.0"}
     sp500 = sp500_raw if isinstance(sp500_raw, dict) else {"value": sp500_raw, "delta": "0"}
     us10y = us10y_raw if isinstance(us10y_raw, dict) else {"value": us10y_raw, "delta": "0.0"}
     vix = vix_raw if isinstance(vix_raw, dict) else {"value": vix_raw, "delta": "0.0"}
-    
+
     with pl1:
-        st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Up is bearish for crypto.")
-        st.metric("S&P 500", sp500.get("value", "5,200"), sp500.get("delta", "+45"), delta_color="normal", help="Global equity correlation. Up is bullish for crypto.")
+        st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Feeds Macro Score directly now. Up is bearish for crypto.")
+        st.metric("S&P 500", sp500.get("value", "5,200"), sp500.get("delta", "+45"), delta_color="normal", help="Global equity correlation. Feeds Macro Score directly now. Up is bullish for crypto.")
     with pl2:
-        st.metric("US 10Y Yield", us10y.get("value", "4.25%"), us10y.get("delta", "+0.02"), delta_color="inverse", help="Risk-free rate. Up is bearish for crypto.")
-        st.metric("VIX", vix.get("value", "14.50"), vix.get("delta", "-0.50"), delta_color="inverse", help="Market fear gauge. Up is bearish for crypto.")
-    
-    st.caption("🟢 Bullish Signal | 🔴 Bearish Signal")
+        st.metric("US 10Y Yield", us10y.get("value", "4.25%"), us10y.get("delta", "+0.02"), delta_color="inverse", help="Risk-free rate. Feeds Macro Score directly now. Up is bearish for crypto.")
+        st.metric("VIX", vix.get("value", "14.50"), vix.get("delta", "-0.50"), delta_color="inverse", help="Market fear gauge. Feeds Macro Score directly now. Up is bearish for crypto.")
+
+    st.caption("🟢 Bullish Signal | 🔴 Bearish Signal — all four now feed the Macro Score directly.")
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>💼 Active Trade Manager</h5>", unsafe_allow_html=True)
-    
+
     col_t1, col_t2 = st.columns(2)
     with col_t1: track_macro = st.toggle("🟢 Macro", value=True)
     with col_t2: track_swing = st.toggle("🔴 Swing", value=True)
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
 
     if not track_macro and not track_swing: st.info("No active trades selected.")
-    
+
     if track_macro:
         with st.expander("🟢 MACRO: Active Long", expanded=True):
             macro_entry = st.number_input("Entry Price ($)", value=63177.84, step=10.0, key="m_entry")
@@ -120,7 +130,7 @@ with st.sidebar:
                 pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
                 pnl_sign = "+" if macro_pnl >= 0 else ""
                 st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}&#36;{macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
-                
+
     if track_swing:
         with st.expander("🔴 SWING: Active Short", expanded=True):
             swing_entry = st.number_input("Entry Price ($)", value=63993.00, step=10.0, key="s_entry")
@@ -133,7 +143,7 @@ with st.sidebar:
                 pnl_sign_s = "+" if swing_pnl >= 0 else ""
                 st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}&#36;{swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
-# --- HEADER & OVERVIEW ---
+# --- HEADER & DATA QUALITY BANNER ---
 header_col1, header_col2 = st.columns([5, 1])
 with header_col1:
     st.markdown("<h2 style='margin-bottom:0;'>⚡ QUANT DESK TERMINAL</h2>", unsafe_allow_html=True)
@@ -145,6 +155,29 @@ with header_col2:
             get_telemetry.clear()
             st.rerun()
 
+if not telemetry:
+    st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
+else:
+    gen_at = data_quality.get("generated_at")
+    freshness = ""
+    if gen_at:
+        try:
+            ts = datetime.fromisoformat(gen_at.replace("Z", "+00:00"))
+            age_s = (datetime.now(timezone.utc) - ts).total_seconds()
+            freshness = f"as of {ts.strftime('%H:%M:%S')} UTC ({age_s:.0f}s ago)"
+        except Exception:
+            freshness = ""
+
+    if data_quality.get("any_fallback"):
+        stale_sources = [k.replace("macro_", "").upper() for k, v in data_quality.items() if v == "fallback" and k not in ("any_fallback", "generated_at")]
+        st.markdown(
+            f"<span class='stale-badge'>🟡 PARTIAL FALLBACK DATA</span> &nbsp; some feeds unreachable, showing placeholder values: "
+            f"**{', '.join(stale_sources)}**. Treat scores as indicative only until these recover. {freshness}",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(f"<span class='live-badge'>🟢 ALL FEEDS LIVE</span> &nbsp; {freshness}", unsafe_allow_html=True)
+
 # --- DYNAMIC SQUEEZE RISK BANNER ---
 hm_data = telemetry.get("orderbook_heatmap", {})
 upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
@@ -153,7 +186,7 @@ ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
 
 if FUNDING_RATE < 0:
     st.warning(f"⚠️ **SYSTEM ALERT: SHORT SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.")
-elif FUNDING_RATE_PCT > 0.10: 
+elif FUNDING_RATE_PCT > 0.10:
     st.warning(f"⚠️ **SYSTEM ALERT: LONG DELEVERAGING RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | High perp premium; late longs susceptible to liquidation.")
 elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
     st.warning(f"⚠️ **SYSTEM ALERT: ABSORPTION / SQUEEZE RISK** | **Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%** | Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.")
@@ -169,11 +202,12 @@ def render_header(title):
 render_header("📊 Live Market Overview")
 m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}")
-m2.metric("1H RSI", f"{ta.get('rsi', 58.0)}")
-m3.metric("1H VWAP", f"${ta.get('vwap', 63888.0):,.2f}")
+m2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}")
+m3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}")
 m4.metric("Open Interest", OPEN_INTEREST)
-m5.metric("Kelly Limit", kelly_display)
+m5.metric("Sizing Guide*", kelly_display, help="Illustrative conviction gauge from an uncalibrated technical score — NOT a real Kelly-criterion position size. Do not use directly for leverage decisions.")
 m6.metric("Execution Gate", exec_gate)
+st.caption("*Sizing Guide uses the Swing Score as a stand-in for win probability. It has not been backtested against realized outcomes and should not be treated as a calibrated position-sizing figure.")
 
 # ==========================================
 # SECTION 2: MULTI-TIMEFRAME MATRIX
@@ -183,10 +217,11 @@ col_macro, col_swing, col_micro = st.columns(3)
 
 with col_macro:
     st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
+    st.caption("Blends DXY, 10Y yield, VIX, S&P 500, plus BTC's own trend.")
     if macro_score >= 5.5: st.success("Directive: LONG (🐂 BULL EXPANSION)")
     elif macro_score <= 4.5: st.error("Directive: SHORT (🐻 BEAR CONTRACTION)")
     else: st.warning("Directive: ⏳ NEUTRAL / CHOP")
-    
+
     ma_setups = setups.get("macro", {})
     st.markdown(f"""
     | Parameter | Target / Level |
@@ -205,7 +240,7 @@ with col_swing:
     if swing_score >= 52.0: st.success("Directive: TACTICAL LONG RALLY")
     elif swing_score <= 48.0: st.error("Directive: TACTICAL LIQUIDATION WAVE")
     else: st.warning("Directive: ⏳ CHOP / NO TRADE")
-    
+
     sw_setups = setups.get("tactical", {})
     st.markdown(f"""
     | Parameter | Target / Level |
@@ -222,11 +257,11 @@ with col_swing:
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
     micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
-    
+
     if "🟢" in micro_dir: st.success(f"Directive: {micro_dir}")
     elif "🔴" in micro_dir: st.error(f"Directive: {micro_dir}")
     else: st.warning(f"Directive: {micro_dir}")
-    
+
     mi_setups = setups.get("micro", {})
     st.markdown(f"""
     | Parameter | Target / Level |
@@ -245,17 +280,13 @@ with col_micro:
 # ==========================================
 if insights or telemetry:
     render_header("📜 Playbook Manifesto")
-    
+
     if "🟢" in exec_gate: playbook_color = st.success
     elif "🔴" in exec_gate: playbook_color = st.error
     elif "⚠️" in exec_gate or "🟡" in exec_gate: playbook_color = st.warning
     else: playbook_color = st.info
-    
-    vwap = ta.get("vwap", LIVE_SPOT_PRICE)
-    
-    # Let the backend dictate the dynamic thesis rather than overriding it with hardcoded NY logic
-    dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
 
+    dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
     safe_guidance = insights.get('institutional_guidance', 'N/A')
     playbook_color(f"**🛡️ INSTITUTIONAL DIRECTIVE:** {safe_guidance}")
     playbook_color(f"**🧠 LIQUIDITY THESIS:** {dynamic_thesis}")
@@ -277,12 +308,6 @@ rg4.metric("Lower Liq Wall", f"${lower_wall:,.0f}")
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
 # ==========================================
-# ==========================================
-# SECTION 5: TELEMETRY & CHARTS
-# ==========================================
-# ==========================================
-# SECTION 5: TELEMETRY & CHARTS
-# ==========================================
 render_header("🔬 Telemetry & Liquidity")
 if not telemetry:
     st.error("⚠️ Backend API is currently unreachable. Retrying in 30 seconds...")
@@ -292,42 +317,29 @@ else:
     with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""))
     with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""))
     with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""))
-    
+    st.caption("Known limitation: sessions are bucketed by hour-of-day across a rolling 24h window, so whichever session is currently in progress shows a partial read rather than a full prior session. Not yet fixed — flagged here rather than presented as directly comparable.")
+
     st.markdown("<br>", unsafe_allow_html=True)
     viz_col1, viz_col2 = st.columns([2, 1])
-    
+
     with viz_col1:
         st.markdown("**🗺️ Order Book Liquidity Heatmap**")
         z_matrix = hm_data.get("z_matrix", []) if hm_data else []
-        
+
         if len(z_matrix) > 0:
             try:
                 z_array = np.array(z_matrix, dtype=float)
                 time_steps = hm_data.get("time_steps", [])
                 prices = hm_data.get("prices", [])
-                
-                # Robust min/max fallback scaling for Turbo color gradient
-                valid_vals = z_array[z_array > 0]
-                if valid_vals.size > 0:
-                    z_min = float(np.percentile(valid_vals, 5))
-                    z_max = float(np.percentile(z_array, 95))
-                else:
-                    z_min, z_max = 0.0, 10.0
-                if z_min >= z_max:
-                    z_max = z_min + 1.0
 
-                # Use absolute 0 floor so empty buckets stay dark background
-                z_max = float(np.percentile(z_array[z_array > 0], 98)) if np.any(z_array > 0) else 10.0
+                valid_vals = z_array[z_array > 0]
+                z_max = float(np.percentile(valid_vals, 98)) if valid_vals.size > 0 else 10.0
+                if z_max <= 0:
+                    z_max = 10.0
 
                 fig_heatmap = go.Figure(data=go.Heatmap(
-                    z=z_array, 
-                    x=time_steps if time_steps else None, 
-                    y=prices if prices else None,
-                    colorscale='Turbo', 
-                    showscale=True,
-                    zmin=0.0, 
-                    zmax=z_max,
-                    zsmooth='best',
+                    z=z_array, x=time_steps if time_steps else None, y=prices if prices else None,
+                    colorscale='Turbo', showscale=True, zmin=0.0, zmax=z_max, zsmooth='best',
                     colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0"))
                 ))
                 fig_heatmap.update_layout(
@@ -339,7 +351,8 @@ else:
                 fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366"))
                 fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1, annotation_text="Lower Support", annotation_font=dict(color="#00E676"))
                 st.plotly_chart(fig_heatmap, use_container_width=True)
-            except Exception as e:
+                st.caption("Price axis is now a fixed grid that only shifts when spot trades outside it (history resets on shift), so columns stay aligned to the labeled prices.")
+            except Exception:
                 st.info("🗺️ Heatmap rendering matrix...")
         else:
             st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
@@ -349,7 +362,8 @@ else:
         vs_data = telemetry.get("volatility_skew", {})
         strike_vals = vs_data.get("strikes", [])
         iv_vals = vs_data.get("iv_surface", [])
-        
+        expiry_label = vs_data.get("expiry", "N/A")
+
         if len(strike_vals) > 0 and len(iv_vals) > 0:
             fig_skew = go.Figure()
             fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
@@ -361,6 +375,7 @@ else:
                 yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"))
             )
             st.plotly_chart(fig_skew, use_container_width=True)
+            st.caption(f"Single expiry only: {expiry_label} (no longer blended across tenors).")
         else:
             st.info("📉 Volatility Skew surface loading...")
 
@@ -378,29 +393,26 @@ else:
 if insights:
     render_header("📝 Quantitative Market Data & Guidance")
     vp_col, cat_col, guide_col = st.columns(3)
-    
+
     with vp_col:
         st.markdown("**📊 Volume Profile**")
         vp = insights.get("volume_profile", {})
         st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
         st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
         st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
-        
+
     with cat_col:
         st.markdown("**⚠️ Upcoming Catalysts & Filters**")
-        for cat in insights.get("catalysts", []): 
+        for cat in insights.get("catalysts", []):
             st.write(f"- {cat}")
-            
+
     with guide_col:
         st.markdown("**🧭 Desk-Level Action Plan**")
         raw_action = insights.get("action_plan", "Execute scaling limits only at structural value nodes.")
-        
-        # Escape dollar signs to prevent Streamlit from triggering LaTeX math mode formatting
         action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
-        
-        if "TRAP" in action_plan_clean: 
+        if "TRAP" in action_plan_clean:
             st.error(action_plan_clean)
-        elif "favorable" in action_plan_clean or "Bullish" in action_plan_clean: 
+        elif "favorable" in action_plan_clean or "Bullish" in action_plan_clean:
             st.success(action_plan_clean)
-        else: 
+        else:
             st.warning(action_plan_clean)
