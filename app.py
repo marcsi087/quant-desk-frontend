@@ -232,8 +232,8 @@ with header_col2:
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**📈 Bootstrap Track Record**")
-        st.caption("Seeds the Track Record from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data.")
-        bt_months = st.number_input("Months of history", min_value=1, max_value=36, value=12, step=1, key="bt_months")
+        st.caption("Seeds the Track Record from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data. 24 months is recommended — Macro's 14-day horizon needs a longer window to build enough non-overlapping samples per bucket.")
+        bt_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="bt_months")
         if st.button("Run Historical Backtest"):
             with st.spinner("Fetching historical data and reconstructing scores — this can take a minute..."):
                 try:
@@ -242,13 +242,33 @@ with header_col2:
                 except Exception as e:
                     bt_result = {"status": "error", "error": str(e)}
             if bt_result.get("status") == "completed":
-                st.success(f"Inserted {bt_result.get('inserted', 0)} backtested rows from {bt_result.get('kline_count', 0)} hourly candles.")
+                cleared_note = f" (replaced {bt_result['cleared_stale']} stale rows from a prior run)" if bt_result.get("cleared_stale") else ""
+                st.success(f"Inserted {bt_result.get('inserted', 0)} backtested rows from {bt_result.get('kline_count', 0)} hourly candles{cleared_note}.")
                 get_telemetry.clear()
                 get_track_record.clear()
             elif bt_result.get("status") == "already_running":
                 st.warning("A backtest is already running — check back shortly.")
             else:
                 st.error(f"Backtest failed: {bt_result.get('error', 'unknown error')}")
+
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**🔬 Factor Research**")
+        st.caption("Tests each raw input (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P) against real forward returns, independently — this is what finds real edge instead of testing pre-bundled, hand-weighted composite scores. Read-only: never changes the live formulas by itself.")
+        fr_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="fr_months")
+        if st.button("Run Factor Research"):
+            with st.spinner("Reconstructing feature history and testing correlations — this can take a minute..."):
+                try:
+                    fr_resp = requests.post(f"{API_URL}/research/run", params={"months": int(fr_months)}, timeout=180)
+                    fr_result = fr_resp.json() if fr_resp.status_code == 200 else {"status": "error", "error": f"HTTP {fr_resp.status_code}"}
+                except Exception as e:
+                    fr_result = {"status": "error", "error": str(e)}
+            if fr_result.get("status") == "completed":
+                st.session_state["last_research_report"] = fr_result
+                st.success(f"Analyzed {fr_result.get('rows_analyzed', 0)} hourly data points across {len(fr_result.get('report', {}))} horizons.")
+            elif fr_result.get("status") == "already_running":
+                st.warning("Research is already running — check back shortly.")
+            else:
+                st.error(f"Research failed: {fr_result.get('error', 'unknown error')}")
 
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
@@ -436,6 +456,18 @@ else:
                 tier_data = track_record.get("tiers", {}).get(tier_key, {})
                 horizon = tier_data.get("horizon", "")
                 st.markdown(f"**{tier_label}** · {horizon} forward return")
+
+                sig = tier_data.get("significance", {})
+                sig_status = sig.get("status")
+                if sig_status == "significant_edge":
+                    bias_badge(f"✓ Validated edge (z={sig.get('z_score')})", "bullish")
+                elif sig_status == "inverted_edge":
+                    bias_badge(f"⚠ Inverted (z={sig.get('z_score')}) — check formula", "conflict")
+                elif sig_status == "no_significant_edge":
+                    bias_badge(f"No confirmed edge yet (z={sig.get('z_score')})", "neutral")
+                else:
+                    bias_badge("Insufficient data to test", "neutral")
+
                 buckets = tier_data.get("buckets", {})
                 for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
                     b = buckets.get(bucket_key, {})
@@ -450,6 +482,36 @@ else:
                         sign = "+" if avg_r is not None and avg_r >= 0 else ""
                         st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
     st.caption(track_record.get("caveat", ""))
+
+    if any(tr.get("significance", {}).get("status") == "inverted_edge" for tr in track_record.get("tiers", {}).values()):
+        status_card(
+            "⚠️ <b>One or more tiers show a statistically significant INVERTED relationship</b> — the bias label "
+            "and the actual historical outcome point opposite directions. Treat that tier's badge with extra "
+            "caution until the formula is revisited.",
+            "conflict",
+        )
+
+# --- Factor Research report (only shown after a run this session) ---
+research_report = st.session_state.get("last_research_report")
+if research_report and research_report.get("report"):
+    render_header("🔬 Factor Research — Which Inputs Actually Predict Returns")
+    st.caption(research_report.get("note", ""))
+    for horizon_label, features in research_report["report"].items():
+        with st.container(border=True):
+            st.markdown(f"**{horizon_label} forward return**")
+            rf_cols = st.columns(4)
+            for i, (feat_name, feat_data) in enumerate(features.items()):
+                with rf_cols[i % 4]:
+                    full = feat_data.get("full_period", {})
+                    r, sig, robust = full.get("r"), full.get("significant"), feat_data.get("robust")
+                    if r is None:
+                        bias_badge(feat_name, "neutral")
+                    elif robust:
+                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust", "bullish" if r > 0 else "bearish")
+                    elif sig:
+                        bias_badge(f"{feat_name}: r={r:+.3f} (not robust)", "neutral")
+                    else:
+                        bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
 
 # ==========================================
 # SECTION 3: SIGNAL SUMMARY
