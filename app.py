@@ -237,6 +237,7 @@ with col_macro:
 
 with col_swing:
     st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
+    st.caption("Blends 24h price change, VWAP divergence, and funding rate.")
     if swing_score >= 52.0: st.success("Directive: TACTICAL LONG RALLY")
     elif swing_score <= 48.0: st.error("Directive: TACTICAL LIQUIDATION WAVE")
     else: st.warning("Directive: ⏳ CHOP / NO TRADE")
@@ -256,6 +257,7 @@ with col_swing:
 
 with col_micro:
     st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
+    st.caption("Blends RSI(14) momentum and VWAP divergence.")
     micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
 
     if "🟢" in micro_dir: st.success(f"Directive: {micro_dir}")
