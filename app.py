@@ -270,6 +270,35 @@ with header_col2:
             else:
                 st.error(f"Research failed: {fr_result.get('error', 'unknown error')}")
 
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**⚖️ Calibrate Formula**")
+        st.caption("Fits actual regression coefficients for a short, evidence-backed feature list against real forward returns — only pass features that already showed 'robust: true' in Factor Research above. Read-only: shows you the fitted numbers, doesn't rewrite any formula by itself.")
+        cal_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="cal_horizon")
+        cal_features = st.text_input("Features (comma-separated)", value="vix_pct,spx_pct", key="cal_features")
+        cal_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="cal_months")
+        if st.button("Run Calibration"):
+            with st.spinner("Fitting regression on the non-overlapping sample — this can take a minute..."):
+                try:
+                    cal_resp = requests.post(
+                        f"{API_URL}/research/calibrate",
+                        params={"months": int(cal_months), "horizon": cal_horizon, "features": cal_features},
+                        timeout=180,
+                    )
+                    cal_result = cal_resp.json() if cal_resp.status_code == 200 else {"status": "error", "error": f"HTTP {cal_resp.status_code}"}
+                except Exception as e:
+                    cal_result = {"status": "error", "error": str(e)}
+            if cal_result.get("status") == "completed":
+                st.session_state["last_calibration"] = cal_result
+                fit = cal_result.get("fit_non_overlapping", {})
+                if "error" in fit:
+                    st.warning(f"Fit didn't converge: {fit['error']}")
+                else:
+                    st.success(f"Fitted on n={fit.get('n')} non-overlapping windows, R²={fit.get('r_squared')}")
+            elif cal_result.get("status") == "already_running":
+                st.warning("A calibration is already running — check back shortly.")
+            else:
+                st.error(f"Calibration failed: {cal_result.get('error', 'unknown error')}")
+
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
 else:
@@ -518,6 +547,25 @@ if research_report and research_report.get("report"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
                     else:
                         bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
+
+# --- Calibration result (only shown after a run this session) ---
+calibration = st.session_state.get("last_calibration")
+if calibration and calibration.get("fit_non_overlapping"):
+    render_header("⚖️ Calibrated Formula")
+    fit_no = calibration["fit_non_overlapping"]
+    fit_ov = calibration.get("fit_overlapping", {})
+    if "error" in fit_no:
+        st.warning(f"Fit didn't converge: {fit_no['error']}")
+    else:
+        st.caption(calibration.get("note", ""))
+        with st.container(border=True):
+            st.markdown(f"**{calibration.get('horizon')} forward return — fitted on n={fit_no['n']} non-overlapping windows, R²={fit_no['r_squared']}**")
+            formula_parts = [f"{fit_no['intercept']:+.4f}"]
+            for feat, coef in fit_no["coefficients"].items():
+                formula_parts.append(f"{coef:+.4f}×{feat}")
+            st.code("forward_return ≈ " + " ".join(formula_parts))
+            if "coefficients" in fit_ov:
+                st.caption("For comparison, the (less trustworthy) overlapping-sample fit: " + ", ".join(f"{k}={v:+.4f}" for k, v in fit_ov["coefficients"].items()) + f", intercept={fit_ov.get('intercept', 0):+.4f}")
 
 # ==========================================
 # SECTION 3: SIGNAL SUMMARY
