@@ -233,6 +233,25 @@ with header_col2:
                 st.error(f"Research failed: {fr_result.get('error', 'unknown error')}")
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**💥 Magnitude Research (Squeeze Risk Test)**")
+        st.caption("Different question than Factor Research: does extreme funding (or extreme VIX, momentum, order flow, or elevated volatility) predict a BIGGER subsequent move, regardless of direction? This is the actual hypothesis behind the Squeeze Risk banner — never tested until now. Read-only, same non-overlap correction as Factor Research.")
+        mag_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="mag_months")
+        if st.button("Run Magnitude Research"):
+            with st.spinner("Testing whether extremity predicts move size — this can take a minute..."):
+                try:
+                    mag_resp = requests.post(f"{API_URL}/research/run-magnitude", params={"months": int(mag_months)}, timeout=180)
+                    mag_result = mag_resp.json() if mag_resp.status_code == 200 else {"status": "error", "error": f"HTTP {mag_resp.status_code}"}
+                except Exception as e:
+                    mag_result = {"status": "error", "error": str(e)}
+            if mag_result.get("status") == "completed":
+                st.session_state["last_magnitude_report"] = mag_result
+                st.success(f"Analyzed {mag_result.get('rows_analyzed', 0)} hourly data points.")
+            elif mag_result.get("status") == "already_running":
+                st.warning("Magnitude research is already running — check back shortly.")
+            else:
+                st.error(f"Magnitude research failed: {mag_result.get('error', 'unknown error')}")
+
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**⚖️ Calibrate Formula**")
         st.caption("Fits actual regression coefficients for a short, evidence-backed feature list against real forward returns — only pass features that already showed 'robust: true' in Factor Research above. Read-only: shows you the fitted numbers, doesn't rewrite any formula by itself.")
         cal_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="cal_horizon")
@@ -484,6 +503,46 @@ if research_report and research_report.get("report"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (fails non-overlap check, n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
+                    else:
+                        bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
+
+# --- Magnitude Research result (squeeze-risk hypothesis test) ---
+magnitude_report = st.session_state.get("last_magnitude_report")
+if magnitude_report and magnitude_report.get("report"):
+    render_header("💥 Magnitude Research — Does Extremity Predict Move Size?")
+    st.caption(magnitude_report.get("note", ""))
+
+    funding_4h = magnitude_report["report"].get("4h", {}).get("funding_rate_abs")
+    if funding_4h:
+        r = funding_4h.get("full_period", {}).get("r")
+        robust = funding_4h.get("robust")
+        no_n = funding_4h.get("non_overlapping", {}).get("n")
+        if r is not None:
+            if robust:
+                status_card(f"✅ <b>Squeeze Risk banner is empirically supported</b> — extreme funding at the 4h horizon (Micro's timeframe) robustly predicts bigger moves: r={r:+.3f}, n={no_n} independent windows.", "bullish")
+            else:
+                status_card(f"⚠️ <b>Squeeze Risk banner is NOT yet empirically confirmed</b> — extreme funding at 4h shows r={r:+.3f} but does not clear the corrected robustness bar (n={no_n} independent windows). The banner's underlying mechanism is real finance, but this specific claim hasn't been validated the way Micro's actual score was.", "neutral")
+
+    for horizon_label, features in magnitude_report["report"].items():
+        with st.container(border=True):
+            st.markdown(f"**{horizon_label} — extremity vs. move size**")
+            mag_cols = st.columns(len(features))
+            for i, (feat_name, feat_data) in enumerate(features.items()):
+                with mag_cols[i % len(mag_cols)]:
+                    full = feat_data.get("full_period", {})
+                    non_overlap = feat_data.get("non_overlapping", {})
+                    r = full.get("r")
+                    robust = feat_data.get("robust")
+                    robust_naive = feat_data.get("robust_naive")
+                    no_n = non_overlap.get("n")
+                    if r is None:
+                        bias_badge(feat_name, "neutral")
+                    elif robust:
+                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust (n={no_n})", "bullish")
+                    elif robust_naive:
+                        bias_badge(f"{feat_name}: r={r:+.3f} (fails non-overlap, n={no_n})", "neutral")
+                    elif full.get("significant"):
+                        bias_badge(f"{feat_name}: r={r:+.3f} (not consistent)", "neutral")
                     else:
                         bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
 
