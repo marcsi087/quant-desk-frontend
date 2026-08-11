@@ -552,21 +552,28 @@ if oos_result and oos_result.get("train_fit"):
             in_sample_r2 = train_fit.get("r_squared")
             oos_r2 = oos_data.get("out_of_sample_r_squared")
             corr = oos_data.get("predicted_vs_actual_correlation", {})
+            corr_significant = corr.get("significant", False)
             oos_col1, oos_col2 = st.columns(2)
             oos_col1.metric("In-sample R² (training portion)", f"{in_sample_r2}")
             oos_col2.metric("Out-of-sample R² (held-out portion)", f"{oos_r2}")
 
-            if oos_r2 is not None and oos_r2 > 0.3 * (in_sample_r2 or 1):
-                verdict_kind, verdict = "bullish", "✅ The formula held up reasonably well on data it never saw — this is real, if modest, evidence of a genuine relationship, not just a fit to one sample."
-            elif oos_r2 is not None and oos_r2 > 0:
-                verdict_kind, verdict = "neutral", "⚠️ Positive but much weaker out-of-sample than in-sample — some real signal may be present, but a meaningful part of the in-sample fit looks like it was overfitting to that specific sample."
-            elif oos_r2 is not None:
-                verdict_kind, verdict = "conflict", "❌ Negative out-of-sample R² — the frozen formula did WORSE than just guessing the training average on data it never saw. The in-sample fit does not appear to reflect a real, generalizing relationship."
-            else:
+            # Verdict is driven primarily by whether the held-out correlation
+            # is actually statistically significant -- NOT just whether OOS R²
+            # retains some fraction of in-sample R². A positive R² ratio can
+            # happen from noise alone at these sample sizes; significance is
+            # the real bar. Getting this backwards was the exact overclaim
+            # this whole tool exists to prevent.
+            if oos_r2 is None:
                 verdict_kind, verdict = "info", "Not enough held-out data to draw a conclusion."
+            elif oos_r2 <= 0:
+                verdict_kind, verdict = "conflict", "❌ Negative out-of-sample R² — the frozen formula did WORSE than just guessing the training average on data it never saw. The in-sample fit does not appear to reflect a real, generalizing relationship."
+            elif corr_significant:
+                verdict_kind, verdict = "bullish", "✅ Positive AND statistically significant on data the formula never saw — this is real, if modest, evidence of a genuine relationship, not just a fit to one sample."
+            else:
+                verdict_kind, verdict = "neutral", "⚠️ Out-of-sample R² is positive, but the predicted-vs-actual correlation on the held-out set is NOT statistically significant — this result is not yet distinguishable from what pure chance could produce at this sample size. Treat this as unresolved, not as confirmed."
             status_card(verdict, verdict_kind)
             if corr:
-                st.caption(f"Predicted-vs-actual correlation on the held-out set: r={corr.get('r')}, n={corr.get('n')}, {'significant' if corr.get('significant') else 'not significant'} — a scale-independent cross-check on the same conclusion.")
+                st.caption(f"Predicted-vs-actual correlation on the held-out set: r={corr.get('r')}, n={corr.get('n')}, {'significant' if corr_significant else 'not significant'} — this significance test is what the verdict above is actually based on.")
 
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
