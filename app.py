@@ -211,7 +211,15 @@ with header_col2:
                     cal_result = cal_resp.json() if cal_resp.status_code == 200 else {"status": "error", "error": f"HTTP {cal_resp.status_code}"}
                 except Exception as e:
                     cal_result = {"status": "error", "error": str(e)}
-            if cal_result.get("status") == "completed":
+            if cal_result.get("status") == "completed" and "error" in cal_result:
+                # run_calibration validates horizon/feature names BEFORE fetching
+                # any data and returns a TOP-LEVEL error in that case, not one
+                # nested inside fit_non_overlapping -- e.g. a typo'd feature name.
+                # Endpoint status is still "completed" since the function returned
+                # normally rather than raising, so this must be checked explicitly
+                # or it silently falls through to a fake success with None values.
+                st.error(f"Calibration couldn't run: {cal_result['error']}")
+            elif cal_result.get("status") == "completed":
                 st.session_state["last_calibration"] = cal_result
                 fit = cal_result.get("fit_non_overlapping", {})
                 if "error" in fit:
