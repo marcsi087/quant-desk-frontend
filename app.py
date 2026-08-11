@@ -231,6 +231,39 @@ with header_col2:
             else:
                 st.error(f"Calibration failed: {cal_result.get('error', 'unknown error')}")
 
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**🔬 Out-of-Sample Test**")
+        st.caption("A stronger, different check than Calibrate Formula above: fits ONLY on the earlier portion of the window, then tests that frozen formula on the later portion it never saw. Calibrate Formula checks whether a coefficient looks similar when refit on more blended data (replication); this checks whether the formula actually predicts anything on genuinely unseen data (prediction). Out-of-sample R² can come back negative — that's a real result, not an error.")
+        oos_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="oos_horizon")
+        oos_features = st.text_input("Features (comma-separated)", value="atr_pct_14h", key="oos_features")
+        oos_months = st.number_input("Months of history", min_value=1, max_value=90, value=48, step=1, key="oos_months")
+        oos_train_frac = st.slider("Train fraction (earlier portion used for fitting)", min_value=0.3, max_value=0.9, value=0.7, step=0.05, key="oos_train_frac")
+        if st.button("Run Out-of-Sample Test"):
+            with st.spinner("Fitting on the early portion, then testing on the later, unseen portion — this can take a minute..."):
+                try:
+                    oos_resp = requests.post(
+                        f"{API_URL}/research/calibrate-oos",
+                        params={"months": int(oos_months), "horizon": oos_horizon, "features": oos_features, "train_frac": oos_train_frac},
+                        timeout=600,
+                    )
+                    oos_result = oos_resp.json() if oos_resp.status_code == 200 else {"status": "error", "error": f"HTTP {oos_resp.status_code}"}
+                except Exception as e:
+                    oos_result = {"status": "error", "error": str(e)}
+            if oos_result.get("status") == "completed" and "error" in oos_result:
+                st.error(f"Out-of-sample test couldn't run: {oos_result['error']}")
+            elif oos_result.get("status") == "completed":
+                st.session_state["last_oos_result"] = oos_result
+                oos_data = oos_result.get("out_of_sample_result", {})
+                if "error" in oos_data:
+                    st.warning(f"Couldn't evaluate held-out set: {oos_data['error']}")
+                else:
+                    r2 = oos_data.get("out_of_sample_r_squared")
+                    st.success(f"Trained on {oos_result.get('train_window_size')} windows, tested on {oos_result.get('test_window_size')} unseen windows — out-of-sample R²={r2}")
+            elif oos_result.get("status") == "already_running":
+                st.warning("An out-of-sample test is already running — check back shortly.")
+            else:
+                st.error(f"Out-of-sample test failed: {oos_result.get('error', 'unknown error')}")
+
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
 else:
@@ -497,6 +530,43 @@ if calibration and calibration.get("fit_non_overlapping"):
             st.code("forward_return ≈ " + " ".join(formula_parts))
             if "coefficients" in fit_ov:
                 st.caption("For comparison, the (less trustworthy) overlapping-sample fit: " + ", ".join(f"{k}={v:+.4f}" for k, v in fit_ov["coefficients"].items()) + f", intercept={fit_ov.get('intercept', 0):+.4f}")
+
+oos_result = st.session_state.get("last_oos_result")
+if oos_result and oos_result.get("train_fit"):
+    render_header("🔬 Out-of-Sample Test Result")
+    train_fit = oos_result["train_fit"]
+    oos_data = oos_result.get("out_of_sample_result", {})
+    if "error" in train_fit:
+        st.warning(f"Training fit didn't converge: {train_fit['error']}")
+    elif "error" in oos_data:
+        st.warning(f"Couldn't evaluate the held-out set: {oos_data['error']}")
+    else:
+        st.caption(oos_result.get("note", ""))
+        with st.container(border=True):
+            st.markdown(f"**{oos_result.get('horizon')} forward return — trained on the earliest {oos_result.get('train_frac', 0)*100:.0f}% ({oos_result.get('train_window_size')} windows), tested on the remaining {oos_result.get('test_window_size')} windows it never saw**")
+            formula_parts = [f"{train_fit['intercept']:+.4f}"]
+            for feat, coef in train_fit["coefficients"].items():
+                formula_parts.append(f"{coef:+.4f}×{feat}")
+            st.code("forward_return ≈ " + " ".join(formula_parts) + "   (frozen, fit on training portion only)")
+
+            in_sample_r2 = train_fit.get("r_squared")
+            oos_r2 = oos_data.get("out_of_sample_r_squared")
+            corr = oos_data.get("predicted_vs_actual_correlation", {})
+            oos_col1, oos_col2 = st.columns(2)
+            oos_col1.metric("In-sample R² (training portion)", f"{in_sample_r2}")
+            oos_col2.metric("Out-of-sample R² (held-out portion)", f"{oos_r2}")
+
+            if oos_r2 is not None and oos_r2 > 0.3 * (in_sample_r2 or 1):
+                verdict_kind, verdict = "bullish", "✅ The formula held up reasonably well on data it never saw — this is real, if modest, evidence of a genuine relationship, not just a fit to one sample."
+            elif oos_r2 is not None and oos_r2 > 0:
+                verdict_kind, verdict = "neutral", "⚠️ Positive but much weaker out-of-sample than in-sample — some real signal may be present, but a meaningful part of the in-sample fit looks like it was overfitting to that specific sample."
+            elif oos_r2 is not None:
+                verdict_kind, verdict = "conflict", "❌ Negative out-of-sample R² — the frozen formula did WORSE than just guessing the training average on data it never saw. The in-sample fit does not appear to reflect a real, generalizing relationship."
+            else:
+                verdict_kind, verdict = "info", "Not enough held-out data to draw a conclusion."
+            status_card(verdict, verdict_kind)
+            if corr:
+                st.caption(f"Predicted-vs-actual correlation on the held-out set: r={corr.get('r')}, n={corr.get('n')}, {'significant' if corr.get('significant') else 'not significant'} — a scale-independent cross-check on the same conclusion.")
 
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
