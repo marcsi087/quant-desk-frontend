@@ -65,16 +65,6 @@ def get_telemetry():
 
 telemetry = get_telemetry()
 
-@st.cache_data(ttl=300)
-def get_track_record():
-    try:
-        r = requests.get(f"{API_URL}/track-record", timeout=10)
-        if r.status_code == 200:
-            return r.json()
-    except Exception:
-        pass
-    return {}
-
 # PULL LIVE TELEMETRY VARIABLES
 LIVE_SPOT_PRICE = telemetry.get("spot_price", 64347.99)
 FUNDING_RATE = telemetry.get("funding_rate", 0.00066)
@@ -179,7 +169,6 @@ with header_col2:
                 cleared_note = f" (replaced {bt_result['cleared_stale']} stale rows from a prior run)" if bt_result.get("cleared_stale") else ""
                 st.success(f"Inserted {bt_result.get('inserted', 0)} backtested rows from {bt_result.get('kline_count', 0)} hourly candles{cleared_note}.")
                 get_telemetry.clear()
-                get_track_record.clear()
             elif bt_result.get("status") == "already_running":
                 st.warning("A backtest is already running — check back shortly.")
             else:
@@ -204,25 +193,6 @@ with header_col2:
                 st.warning("Research is already running — check back shortly.")
             else:
                 st.error(f"Research failed: {fr_result.get('error', 'unknown error')}")
-
-        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
-        st.markdown("**💥 Magnitude Research (Squeeze Risk Test)**")
-        st.caption("Different question than Factor Research: does extreme funding (or extreme VIX, momentum, order flow, or elevated volatility) predict a BIGGER subsequent move, regardless of direction? This is the actual hypothesis behind the Squeeze Risk banner — never tested until now. Read-only, same non-overlap correction as Factor Research.")
-        mag_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="mag_months")
-        if st.button("Run Magnitude Research"):
-            with st.spinner("Testing whether extremity predicts move size — this can take a minute..."):
-                try:
-                    mag_resp = requests.post(f"{API_URL}/research/run-magnitude", params={"months": int(mag_months)}, timeout=600)
-                    mag_result = mag_resp.json() if mag_resp.status_code == 200 else {"status": "error", "error": f"HTTP {mag_resp.status_code}"}
-                except Exception as e:
-                    mag_result = {"status": "error", "error": str(e)}
-            if mag_result.get("status") == "completed":
-                st.session_state["last_magnitude_report"] = mag_result
-                st.success(f"Analyzed {mag_result.get('rows_analyzed', 0)} hourly data points.")
-            elif mag_result.get("status") == "already_running":
-                st.warning("Magnitude research is already running — check back shortly.")
-            else:
-                st.error(f"Magnitude research failed: {mag_result.get('error', 'unknown error')}")
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**⚖️ Calibrate Formula**")
@@ -393,11 +363,16 @@ if price_chart_data:
         st.caption("Real hourly candles from Binance, same fetch that powers 7-Day Momentum on the Confluence Board below. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
 
 # ==========================================
-# MICRO SIGNAL — the one tier with a validated, calibrated edge
+# MICRO SIGNAL — the one tier with a validated, calibrated edge. This is
+# the single trading-bias source on this dashboard right now, so it also
+# carries the evidence that used to live in a separate Track Record
+# section: the significance test, per-bucket win rates, and sample sizes.
+# Macro/Swing get informational treatment only (see Macro Conditions
+# below) until they clear the same bar.
 # ==========================================
 render_header("🎯 Micro Signal (1-4 HRS) — The Actionable Timeframe")
 with st.container(border=True):
-    st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon. Note: R²=0.023 is a small, real, repeatable statistical tilt, not a strong individual prediction — see Track Record for what an edge this size looks like in realized win rates, and treat it as one input, not a certainty.")
+    st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon. R²=0.023 is a small, real, repeatable statistical tilt, not a strong individual prediction — the evidence below shows what an edge this size looks like in realized outcomes.")
     micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
     if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
     elif "🔴" in micro_dir: bias_badge(micro_dir, "bearish")
@@ -406,70 +381,65 @@ with st.container(border=True):
     micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
     st.caption(f"**Rationale:** {micro_rat}")
 
-st.caption("Macro and Swing moved to the Confluence Board below — we tested composite scores for both against ~2 years of real data and found no reliable edge, so a bias badge and price-target table for them would have been presenting more confidence than the evidence supports.")
+    st.markdown("<hr style='border:0.5px solid #333; margin: 16px 0;'>", unsafe_allow_html=True)
+    st.markdown("**📊 Evidence — Does This Signal Actually Work?**")
 
-# ==========================================
-# TRACK RECORD — does this signal actually work?
-# ==========================================
-track_record = get_track_record()
+    micro_evidence = telemetry.get("micro_evidence", {})
+    sig = micro_evidence.get("significance", {})
+    sig_status = sig.get("status")
+    min_n = telemetry.get("micro_sizing_guide", {}).get("min_sample_size", 20)
+    if sig_status == "significant_edge":
+        bias_badge(f"✓ Validated edge (z={sig.get('z_score')})", "bullish")
+    elif sig_status == "inverted_edge":
+        bias_badge(f"⚠ Inverted (z={sig.get('z_score')}) — check formula", "conflict")
+    elif sig_status == "no_significant_edge":
+        bias_badge(f"No confirmed edge yet (z={sig.get('z_score')})", "neutral")
+    else:
+        bias_badge("Insufficient data to test", "neutral")
 
-render_header("📈 Track Record — Does This Signal Actually Work?")
-if not track_record or not track_record.get("tracking_since"):
-    st.info("No historical data logged yet. This instance just started tracking scores against what price actually did afterward — check back once it's had time to accumulate readings.")
-else:
-    try:
-        since_dt = datetime.fromisoformat(track_record["tracking_since"].replace("Z", "+00:00"))
-        since_label = since_dt.strftime("%b %d, %Y")
-    except Exception:
-        since_label = track_record["tracking_since"]
-    st.caption(f"Tracking since {since_label} · minimum sample size for a reading to be shown as reliable: {track_record.get('min_sample_size', 20)}")
+    buckets = micro_evidence.get("buckets", {})
+    ev_cols = st.columns(3)
+    for i, (bucket_key, bucket_label) in enumerate([("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]):
+        with ev_cols[i]:
+            b = buckets.get(bucket_key, {})
+            n = b.get("n", 0)
+            live_n, bt_n = b.get("live_n", 0), b.get("backtest_n", 0)
+            src_note = f"{live_n} live, {bt_n} backtest" if bt_n else f"{live_n} live"
+            if not b.get("sufficient_sample"):
+                st.caption(f"**{bucket_label}**\n\nn={n} ({src_note}) — still collecting (need {min_n})")
+            else:
+                avg_r = b.get("avg_return_pct")
+                pct_pos = b.get("pct_positive")
+                sign = "+" if avg_r is not None and avg_r >= 0 else ""
+                st.caption(f"**{bucket_label}**\n\navg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
 
-    tr_cols = st.columns(3)
-    tier_meta = [
-        ("macro", "🌐 Macro", tr_cols[0]),
-        ("swing", "🔴 Swing", tr_cols[1]),
-        ("micro", "🎯 Micro", tr_cols[2]),
-    ]
-    for tier_key, tier_label, col in tier_meta:
-        with col:
-            with st.container(border=True):
-                tier_data = track_record.get("tiers", {}).get(tier_key, {})
-                horizon = tier_data.get("horizon", "")
-                st.markdown(f"**{tier_label}** · {horizon} forward return")
-
-                sig = tier_data.get("significance", {})
-                sig_status = sig.get("status")
-                if sig_status == "significant_edge":
-                    bias_badge(f"✓ Validated edge (z={sig.get('z_score')})", "bullish")
-                elif sig_status == "inverted_edge":
-                    bias_badge(f"⚠ Inverted (z={sig.get('z_score')}) — check formula", "conflict")
-                elif sig_status == "no_significant_edge":
-                    bias_badge(f"No confirmed edge yet (z={sig.get('z_score')})", "neutral")
-                else:
-                    bias_badge("Insufficient data to test", "neutral")
-
-                buckets = tier_data.get("buckets", {})
-                for bucket_key, bucket_label in [("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]:
-                    b = buckets.get(bucket_key, {})
-                    n = b.get("n", 0)
-                    live_n, bt_n = b.get("live_n", 0), b.get("backtest_n", 0)
-                    src_note = f"{live_n} live, {bt_n} backtest" if bt_n else f"{live_n} live"
-                    if not b.get("sufficient_sample"):
-                        st.caption(f"{bucket_label}: n={n} ({src_note}) — still collecting (need {track_record.get('min_sample_size', 20)})")
-                    else:
-                        avg_r = b.get("avg_return_pct")
-                        pct_pos = b.get("pct_positive")
-                        sign = "+" if avg_r is not None and avg_r >= 0 else ""
-                        st.write(f"{bucket_label}: avg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
-    st.caption(track_record.get("caveat", ""))
-
-    if any(tr.get("significance", {}).get("status") == "inverted_edge" for tr in track_record.get("tiers", {}).values()):
+    if sig_status == "inverted_edge":
         status_card(
-            "⚠️ <b>One or more tiers show a statistically significant INVERTED relationship</b> — the bias label "
-            "and the actual historical outcome point opposite directions. Treat that tier's badge with extra "
-            "caution until the formula is revisited.",
-            "conflict",
+            "⚠️ <b>Statistically significant INVERTED relationship</b> — the bias label and the actual "
+            "historical outcome point opposite directions. Treat the badge above with extra caution until "
+            "the formula is revisited.", "conflict",
         )
+
+    st.markdown("<hr style='border:0.5px solid #333; margin: 16px 0;'>", unsafe_allow_html=True)
+    sizing = telemetry.get("micro_sizing_guide", {})
+    sz_col1, sz_col2 = st.columns(2)
+    if sizing.get("available"):
+        kelly_display = f"{sizing['quarter_kelly_pct']:.2f}%"
+        sizing_help = (
+            f"Based on {sizing['sample_size']} historical Micro-{sizing.get('current_bucket', 'neutral').title()} "
+            f"readings on this instance: {sizing['win_rate_pct']:.0f}% ended positive, avg win +{sizing['avg_win_pct']:.2f}%, "
+            f"avg loss -{sizing['avg_loss_pct']:.2f}%. Quarter-Kelly of that edge is shown. Still a small, "
+            f"instance-specific sample, not a professionally validated figure -- not investment advice."
+        )
+    else:
+        n = sizing.get("sample_size", 0)
+        kelly_display = f"Collecting ({n}/{min_n})"
+        sizing_help = f"Not enough history yet for Micro-{sizing.get('current_bucket', 'neutral').title()} readings to estimate a real edge ({n} of {min_n} needed). Run a historical backtest from Settings to bootstrap this quickly, or check back once more live readings like this one have accumulated."
+    sz_col1.metric("Sizing Guide*", kelly_display, help=sizing_help)
+    st.caption("*Quarter-Kelly sizing grounded in this instance's own empirical Micro track record (real observed win rate and avg win/loss) — not a formula-derived guess. Still a small, instance-specific sample; not investment advice.")
+
+st.caption("Macro and Swing are shown as informational Macro Conditions below, not a trading bias — we tested composite scores for both against ~2 years of real data and found no reliable edge (see Factor Research in Settings).")
+
 
 # --- Factor Research report (only shown after a run this session) ---
 research_report = st.session_state.get("last_research_report")
@@ -498,54 +468,6 @@ if research_report and research_report.get("report"):
                         bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no_str} at n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
-                    else:
-                        bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
-
-# --- Magnitude Research result (squeeze-risk hypothesis test) ---
-magnitude_report = st.session_state.get("last_magnitude_report")
-if magnitude_report and magnitude_report.get("report"):
-    render_header("💥 Magnitude Research — Does Extremity Predict Move Size?")
-    st.caption(magnitude_report.get("note", ""))
-
-    funding_4h = magnitude_report["report"].get("4h", {}).get("funding_rate_abs")
-    if funding_4h:
-        r = funding_4h.get("full_period", {}).get("r")
-        robust = funding_4h.get("robust")
-        no_n = funding_4h.get("non_overlapping", {}).get("n")
-        if r is not None:
-            if robust:
-                status_card(f"✅ <b>Squeeze Risk banner is empirically supported</b> — extreme funding at the 4h horizon (Micro's timeframe) robustly predicts bigger moves: r={r:+.3f}, n={no_n} independent windows.", "bullish")
-            else:
-                status_card(f"⚠️ <b>Squeeze Risk banner is NOT yet empirically confirmed</b> — extreme funding at 4h shows r={r:+.3f} but does not clear the corrected robustness bar (n={no_n} independent windows). The banner's underlying mechanism is real finance, but this specific claim hasn't been validated the way Micro's actual score was.", "neutral")
-
-    oi_quality = magnitude_report.get("oi_data_quality", {})
-    if oi_quality:
-        oi_kind = "bullish" if oi_quality.get("tested") else "neutral"
-        oi_icon = "📊" if oi_quality.get("tested") else "ℹ️"
-        status_card(f"{oi_icon} <b>Open Interest coverage:</b> {oi_quality.get('note', '')}", oi_kind)
-
-    for horizon_label, features in magnitude_report["report"].items():
-        with st.container(border=True):
-            st.markdown(f"**{horizon_label} — extremity vs. move size**")
-            mag_cols = st.columns(len(features))
-            for i, (feat_name, feat_data) in enumerate(features.items()):
-                with mag_cols[i % len(mag_cols)]:
-                    full = feat_data.get("full_period", {})
-                    non_overlap = feat_data.get("non_overlapping", {})
-                    r = full.get("r")
-                    r_no = non_overlap.get("r")
-                    robust = feat_data.get("robust")
-                    robust_naive = feat_data.get("robust_naive")
-                    no_n = non_overlap.get("n")
-                    r_no_str = f"{r_no:+.3f}" if r_no is not None else "N/A"
-                    if r is None:
-                        bias_badge(feat_name, "neutral")
-                    elif robust:
-                        bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n})", "bullish")
-                    elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no_str} at n={no_n})", "neutral")
-                    elif full.get("significant"):
-                        bias_badge(f"{feat_name}: r={r:+.3f} (not consistent)", "neutral")
                     else:
                         bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
 
@@ -687,27 +609,58 @@ else:
         st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
 
 # ==========================================
-# MACRO CONDITIONS — live market context and education, not a bias source.
-# Micro is the only tier with a validated, tested edge right now (see
-# Track Record and Factor Research), so it's the only place this dashboard
-# shows a trading bias. Everything below used to also compute a bullish/
-# bearish "consensus" lean per factor and an aggregate scenario verdict --
-# removed deliberately, since that classification is itself a form of
-# trading bias for Swing/Macro timeframes, just a hedged one. What's kept:
-# the real live values and the same educational explanations (unchanged --
-# they were already good) of what each metric IS and how it CAN affect
-# crypto markets generally. Once Factor Research finds validated signal at
-# Swing or Macro horizons, bias classification can return for those tiers.
+# CONFLUENCE BOARD — at-a-glance market conditions for beginners, not a
+# trading directive. Micro (4h) remains the only VALIDATED, calibrated
+# trading-bias source on this dashboard (see the evidence in the Micro
+# card above) -- this board is a different thing: it organizes real, live
+# macro/market inputs with an honest lean per factor and an aggregate
+# read, so someone can see "conditions look broadly supportive/mixed/
+# unsupportive right now" without either (a) reading six raw numbers and
+# guessing what they mean together, or (b) being told what to do about it.
 # ==========================================
 confluence = telemetry.get("confluence_board")
 if confluence:
-    render_header("🌐 Macro Conditions — Market Context & Education")
-    st.caption("Live inputs relevant to Bitcoin's broader backdrop, shown for context and education — not as a trading signal. Micro (4h) is the only timeframe with a data-backed, tested edge right now (see Track Record and Factor Research); everything here is informational until Swing or Macro clear the same bar.")
+    render_header("🧭 Confluence Board — Conditions at a Glance")
+    st.caption("Six real, live inputs to Bitcoin's broader backdrop, each with an honest lean — this is NOT a trading signal for Swing/Macro timeframes. We tested composite scores like this against ~2 years of real data and found no reliable directional edge (see Factor Research in Settings). Micro (4h, above) is the only tier with a validated, tested edge right now. Think of this as 'here's the weather,' not 'here's the trade.'")
 
+    b, r, n = confluence.get("bullish_count", 0), confluence.get("bearish_count", 0), confluence.get("neutral_count", 0)
+    fig_bar = go.Figure()
+    fig_bar.add_trace(go.Bar(x=[b], y=[""], orientation="h", marker_color="#00E676", name="Bullish",
+                              text=f"{b} Bullish" if b else "", textposition="inside", insidetextanchor="middle",
+                              textfont=dict(color="#0A0E17", size=13)))
+    fig_bar.add_trace(go.Bar(x=[n], y=[""], orientation="h", marker_color="#8892B0", name="Neutral",
+                              text=f"{n} Neutral" if n else "", textposition="inside", insidetextanchor="middle",
+                              textfont=dict(color="#0A0E17", size=13)))
+    fig_bar.add_trace(go.Bar(x=[r], y=[""], orientation="h", marker_color="#FF3366", name="Bearish",
+                              text=f"{r} Bearish" if r else "", textposition="inside", insidetextanchor="middle",
+                              textfont=dict(color="#0A0E17", size=13)))
+    fig_bar.update_layout(
+        barmode="stack", height=70, margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", showlegend=False,
+        xaxis=dict(visible=False, range=[0, b + n + r]), yaxis=dict(visible=False),
+    )
+    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+
+    scenario_kind_map = {
+        "strong_bullish": "bullish", "strong_bearish": "bearish",
+        "moderate_bullish": "bullish", "moderate_bearish": "bearish",
+        "split": "conflict", "quiet": "neutral",
+    }
+    scenario_kind = scenario_kind_map.get(confluence.get("scenario"), "info")
+    status_card(
+        f"{confluence.get('scenario_icon', '')} <b>{confluence.get('scenario_label', '')}</b><br>{confluence.get('scenario_summary', '')}",
+        scenario_kind,
+    )
+    with st.expander("Read the full explanation of this pattern"):
+        st.markdown(confluence.get("scenario_explanation", ""))
+
+    lean_badge_kind = {"bullish": "bullish", "bearish": "bearish", "neutral": "neutral"}
     factor_cols = st.columns(3)
     for i, factor in enumerate(confluence.get("factors", [])):
         with factor_cols[i % 3]:
             with st.container(border=True):
                 st.markdown(f"**{factor['label']}**")
-                st.markdown(f"#### {factor['value_str']}")
+                bias_badge(f"{factor['value_str']} · {factor['lean'].title()}", lean_badge_kind.get(factor['lean'], "neutral"))
                 st.caption(factor["explanation"])
+
+    st.caption(confluence.get("disclaimer", ""))
