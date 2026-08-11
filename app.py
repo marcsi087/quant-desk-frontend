@@ -317,6 +317,27 @@ elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
     status_card(f"⚠️ <b>Absorption / Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.", "neutral")
 else:
     status_card(f"ℹ️ <b>Market Structure Normal</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%.", "info")
+st.caption("Tested via Magnitude Research: funding extremity did NOT robustly predict bigger 4h moves (r=+0.056, not consistent across periods). The mechanism above is real finance but unconfirmed at this horizon — treat this banner as descriptive, not as a validated guardrail. See the Volatility Guardrail below for what actually tested robust.")
+
+# --- VOLATILITY GUARDRAIL — built from what Magnitude Research actually
+# validated at 4h (Micro's horizon), not from an assumption. ATR (r=+0.270)
+# and VIX extremity (r=+0.181) both robustly predicted bigger subsequent
+# moves on n=4,313 independent windows -- the strongest, most trustworthy
+# result in that whole test. This is a magnitude warning, not a direction
+# call: it says "expect a bigger swing," not "expect it to go up or down."
+atr_pct_val = ta.get("atr_pct", 0.01)
+vix_pct_val = plumbing.get("vix", {}).get("pct_change", 0.0) if isinstance(plumbing.get("vix"), dict) else 0.0
+atr_elevated = atr_pct_val > 0.015
+vix_elevated = abs(vix_pct_val) > 3.0
+
+if atr_elevated and vix_elevated:
+    status_card(f"🌪️ <b>High Volatility Regime</b> · 1H ATR: {atr_pct_val*100:.2f}% · VIX move: {vix_pct_val:+.2f}% · Both signals elevated together — validated to predict bigger 4h moves (ATR r=+0.270, VIX r=+0.181, robust on n=4,313). Expect wider swings in either direction; size and stops accordingly, not just directional bias.", "conflict")
+elif atr_elevated:
+    status_card(f"⚠️ <b>Elevated Recent Volatility</b> · 1H ATR: {atr_pct_val*100:.2f}% · The single strongest validated 4h magnitude predictor we've tested (r=+0.270, robust, n=4,313). Bigger-than-usual moves are more likely in either direction over the next few hours.", "neutral")
+elif vix_elevated:
+    status_card(f"⚠️ <b>Elevated VIX Movement</b> · VIX move: {vix_pct_val:+.2f}% · Validated 4h magnitude predictor (r=+0.181, robust, n=4,313). Bigger-than-usual BTC moves are more likely in either direction over the next few hours.", "neutral")
+else:
+    status_card(f"✅ <b>Normal Volatility Regime</b> · 1H ATR: {atr_pct_val*100:.2f}% · VIX move: {vix_pct_val:+.2f}% · Neither validated magnitude signal is elevated right now.", "info")
 
 def render_header(title):
     st.markdown(f"<h4 style='color: #E0E0E0; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 40px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;'>{title}</h4>", unsafe_allow_html=True)
@@ -492,15 +513,16 @@ if research_report and research_report.get("report"):
                     full = feat_data.get("full_period", {})
                     non_overlap = feat_data.get("non_overlapping", {})
                     r = full.get("r")
+                    r_no = non_overlap.get("r")
                     robust = feat_data.get("robust")
                     robust_naive = feat_data.get("robust_naive")
                     no_n = non_overlap.get("n")
                     if r is None:
                         bias_badge(feat_name, "neutral")
                     elif robust:
-                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust (n={no_n} independent)", "bullish" if r > 0 else "bearish")
+                        bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n} independent)", "bullish" if r_no > 0 else "bearish")
                     elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} (fails non-overlap check, n={no_n})", "neutral")
+                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no:+.3f} at n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
                     else:
@@ -538,15 +560,16 @@ if magnitude_report and magnitude_report.get("report"):
                     full = feat_data.get("full_period", {})
                     non_overlap = feat_data.get("non_overlapping", {})
                     r = full.get("r")
+                    r_no = non_overlap.get("r")
                     robust = feat_data.get("robust")
                     robust_naive = feat_data.get("robust_naive")
                     no_n = non_overlap.get("n")
                     if r is None:
                         bias_badge(feat_name, "neutral")
                     elif robust:
-                        bias_badge(f"{feat_name}: r={r:+.3f} ✓ robust (n={no_n})", "bullish")
+                        bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n})", "bullish")
                     elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} (fails non-overlap, n={no_n})", "neutral")
+                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no:+.3f} at n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent)", "neutral")
                     else:
