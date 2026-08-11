@@ -93,34 +93,6 @@ plumbing = telemetry.get("macro_plumbing", {
 })
 insights = telemetry.get("insights", {})
 
-# --- SIZING GUIDE (now grounded in this instance's own empirical Track
-# Record instead of a formula that treated an unrelated technical score as a
-# win probability). See compute_sizing_guide() in the backend: it uses the
-# ACTUAL win rate and average win/loss size observed historically for Swing
-# readings like the current one, and openly says "not enough data yet"
-# rather than showing a number nobody can act on. ---
-sizing = telemetry.get("sizing_guide", {})
-sizing_bucket = sizing.get("current_bucket", "neutral").title()
-sizing_live_n, sizing_bt_n = sizing.get("live_n", 0), sizing.get("backtest_n", 0)
-sizing_src_note = f"{sizing_live_n} live-observed, {sizing_bt_n} backtested" if sizing_bt_n else f"{sizing_live_n} live-observed"
-if sizing.get("available"):
-    kelly_display = f"{sizing['quarter_kelly_pct']:.2f}%"
-    sizing_help = (
-        f"Based on {sizing['sample_size']} historical Swing-{sizing_bucket} readings on this instance "
-        f"({sizing_src_note}): {sizing['win_rate_pct']:.0f}% ended positive, avg win +{sizing['avg_win_pct']:.2f}%, "
-        f"avg loss -{sizing['avg_loss_pct']:.2f}%. Quarter-Kelly of that edge is shown. Still a small, "
-        f"instance-specific sample, not a professionally validated figure -- not investment advice."
-    )
-else:
-    n = sizing.get("sample_size", 0)
-    min_n = sizing.get("min_sample_size", 20)
-    kelly_display = f"Collecting ({n}/{min_n})"
-    sizing_help = (
-        f"Not enough history yet for Swing-{sizing_bucket} readings to estimate a real edge "
-        f"({n} of {min_n} needed, {sizing_src_note}). Run a historical backtest from Settings to bootstrap "
-        f"this quickly, or check back once more live readings like this one have accumulated."
-    )
-
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
@@ -304,21 +276,16 @@ else:
     else:
         st.markdown(f"<span class='live-badge'>🟢 ALL FEEDS LIVE</span> &nbsp; {freshness}", unsafe_allow_html=True)
 
-# --- DYNAMIC SQUEEZE RISK BANNER ---
+# --- Wall/CVD reference values, used by the price chart and heatmap below.
+# (The Squeeze Risk banner that used to live here was removed -- Magnitude
+# Research showed funding extremity does NOT robustly predict bigger moves
+# at any tested horizon, so presenting it as a prominent risk alarm implied
+# more confidence than the evidence supports. Funding rate itself is still
+# shown, with real data and honest context, in Macro Conditions below.) ---
 hm_data = telemetry.get("orderbook_heatmap", {})
 upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
-
-if FUNDING_RATE < -0.0005 and "+" in ny_cvd_raw:
-    status_card(f"⚠️ <b>Short Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Negative funding (crowded shorts) paired with confirmed aggressive buying above \\${upper_wall:,.0f}.", "bullish")
-elif FUNDING_RATE_PCT > 0.10:
-    status_card(f"⚠️ <b>Long Deleveraging Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · High perp premium; late longs susceptible to liquidation.", "bearish")
-elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
-    status_card(f"⚠️ <b>Absorption / Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Buyers absorbed below VWAP (\\${ta.get('vwap', 0):,.2f}). Liquidity wall at \\${upper_wall:,.0f}.", "neutral")
-else:
-    status_card(f"ℹ️ <b>Market Structure Normal</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}%.", "info")
-st.caption("Tested via Magnitude Research: funding extremity did NOT robustly predict bigger moves at ANY tested horizon (4h, 2d, or 14d). The mechanism above is real finance but unconfirmed everywhere we've checked — treat this banner as descriptive, not as a validated guardrail. See the Volatility Guardrail below for what actually tested robust.")
 
 # --- VOLATILITY GUARDRAIL — built from what Magnitude Research actually
 # validated at 4h (Micro's horizon), not from an assumption. THREE signals
@@ -370,7 +337,7 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 render_header("📊 Live Market Overview")
 deltas = telemetry.get("deltas", {})
 with st.container(border=True):
-    ov_r1c1, ov_r1c2, ov_r1c3 = st.columns(3)
+    ov_r1c1, ov_r1c2, ov_r1c3, ov_r1c4 = st.columns(4)
     spot_delta = deltas.get("spot_pct_24h")
     ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
                     delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
@@ -382,14 +349,10 @@ with st.container(border=True):
     ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
                     delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
                     help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
-
-    ov_r2c1, ov_r2c2 = st.columns(2)
     oi_delta = deltas.get("oi_1h_pct")
-    ov_r2c1.metric("Open Interest", OPEN_INTEREST,
+    ov_r1c4.metric("Open Interest", OPEN_INTEREST,
                     delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
                     help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
-    ov_r2c2.metric("Sizing Guide*", kelly_display, help=sizing_help)
-    st.caption("*Sizing Guide is based on this instance's own Track Record (empirical win rate and avg win/loss for the current Swing bias bucket) via quarter-Kelly — not a formula-derived guess. Still a small, instance-specific sample; not investment advice.")
 
 # ==========================================
 # PRICE CHART — the one thing every trading dashboard should lead with,
@@ -724,35 +687,27 @@ else:
         st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
 
 # ==========================================
-# CONFLUENCE BOARD — live context for Swing/Macro thinking, not a score
+# MACRO CONDITIONS — live market context and education, not a bias source.
+# Micro is the only tier with a validated, tested edge right now (see
+# Track Record and Factor Research), so it's the only place this dashboard
+# shows a trading bias. Everything below used to also compute a bullish/
+# bearish "consensus" lean per factor and an aggregate scenario verdict --
+# removed deliberately, since that classification is itself a form of
+# trading bias for Swing/Macro timeframes, just a hedged one. What's kept:
+# the real live values and the same educational explanations (unchanged --
+# they were already good) of what each metric IS and how it CAN affect
+# crypto markets generally. Once Factor Research finds validated signal at
+# Swing or Macro horizons, bias classification can return for those tiers.
 # ==========================================
 confluence = telemetry.get("confluence_board")
 if confluence:
-    render_header("🧭 Confluence Board — Swing & Macro Context")
-    st.caption("Six real, live inputs relevant to a multi-day-to-multi-week view of Bitcoin — each shown with its own honest lean and explanation. This is deliberately NOT a single composite score: we tested that approach for Swing and Macro against ~2 years of real data and found no reliable edge (see Track Record and Factor Research). This organizes real information for your own judgment instead.")
-
-    SCENARIO_KIND_MAP = {
-        "strong_bullish": "bullish", "strong_bearish": "bearish",
-        "moderate_bullish": "bullish", "moderate_bearish": "bearish",
-        "split": "conflict", "quiet": "neutral",
-    }
-    LEAN_BADGE_KIND = {"bullish": "bullish", "bearish": "bearish", "neutral": "neutral"}
+    render_header("🌐 Macro Conditions — Market Context & Education")
+    st.caption("Live inputs relevant to Bitcoin's broader backdrop, shown for context and education — not as a trading signal. Micro (4h) is the only timeframe with a data-backed, tested edge right now (see Track Record and Factor Research); everything here is informational until Swing or Macro clear the same bar.")
 
     factor_cols = st.columns(3)
     for i, factor in enumerate(confluence.get("factors", [])):
         with factor_cols[i % 3]:
             with st.container(border=True):
                 st.markdown(f"**{factor['label']}**")
-                bias_badge(f"{factor['value_str']} · {factor['lean'].title()}", LEAN_BADGE_KIND.get(factor['lean'], "neutral"))
+                st.markdown(f"#### {factor['value_str']}")
                 st.caption(factor["explanation"])
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    b, r, n = confluence.get("bullish_count", 0), confluence.get("bearish_count", 0), confluence.get("neutral_count", 0)
-    scenario_kind = SCENARIO_KIND_MAP.get(confluence.get("scenario"), "info")
-    status_card(
-        f"{confluence.get('scenario_icon', '')} <b>{confluence.get('scenario_label', '')}</b> — "
-        f"{b} bullish · {r} bearish · {n} neutral<br>{confluence.get('scenario_summary', '')}",
-        scenario_kind,
-    )
-    st.markdown(confluence.get("scenario_explanation", ""))
-    st.caption(confluence.get("disclaimer", ""))
