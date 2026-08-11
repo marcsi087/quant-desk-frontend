@@ -517,12 +517,13 @@ if research_report and research_report.get("report"):
                     robust = feat_data.get("robust")
                     robust_naive = feat_data.get("robust_naive")
                     no_n = non_overlap.get("n")
+                    r_no_str = f"{r_no:+.3f}" if r_no is not None else "N/A"
                     if r is None:
                         bias_badge(feat_name, "neutral")
                     elif robust:
                         bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n} independent)", "bullish" if r_no > 0 else "bearish")
                     elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no:+.3f} at n={no_n})", "neutral")
+                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no_str} at n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
                     else:
@@ -564,12 +565,13 @@ if magnitude_report and magnitude_report.get("report"):
                     robust = feat_data.get("robust")
                     robust_naive = feat_data.get("robust_naive")
                     no_n = non_overlap.get("n")
+                    r_no_str = f"{r_no:+.3f}" if r_no is not None else "N/A"
                     if r is None:
                         bias_badge(feat_name, "neutral")
                     elif robust:
                         bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n})", "bullish")
                     elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no:+.3f} at n={no_n})", "neutral")
+                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no_str} at n={no_n})", "neutral")
                     elif full.get("significant"):
                         bias_badge(f"{feat_name}: r={r:+.3f} (not consistent)", "neutral")
                     else:
