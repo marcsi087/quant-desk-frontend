@@ -290,8 +290,8 @@ upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
 
-if FUNDING_RATE < 0:
-    status_card(f"⚠️ <b>Short Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Negative funding paired with aggressive buying above \\${upper_wall:,.0f}.", "bullish")
+if FUNDING_RATE < -0.0005 and "+" in ny_cvd_raw:
+    status_card(f"⚠️ <b>Short Squeeze Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · Negative funding (crowded shorts) paired with confirmed aggressive buying above \\${upper_wall:,.0f}.", "bullish")
 elif FUNDING_RATE_PCT > 0.10:
     status_card(f"⚠️ <b>Long Deleveraging Risk</b> · Avg Perp Funding: {FUNDING_RATE_PCT:.4f}% · High perp premium; late longs susceptible to liquidation.", "bearish")
 elif LIVE_SPOT_PRICE < ta.get("vwap", LIVE_SPOT_PRICE) and "+" in ny_cvd_raw:
