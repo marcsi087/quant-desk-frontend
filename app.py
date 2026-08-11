@@ -85,7 +85,6 @@ scores = telemetry.get("scores", {"macro": 5.0, "swing": 50.0, "micro": 50.0})
 macro_score = scores.get("macro", 5.0)
 swing_score = scores.get("swing", 50.0)
 micro_score = scores.get("micro", 50.0)
-setups = telemetry.get("trade_setups", {})
 data_quality = telemetry.get("data_quality", {})
 
 plumbing = telemetry.get("macro_plumbing", {
@@ -93,43 +92,6 @@ plumbing = telemetry.get("macro_plumbing", {
     "vix": {"value": "14.50", "delta": "+0.00"}, "sp500": {"value": "5,200", "delta": "+0"}
 })
 insights = telemetry.get("insights", {})
-
-# --- BIAS + CONFIDENCE (educational framing: state the bias and how far it
-# is from neutral, never an instruction to act) ---
-def confidence_label(score, bull_thresh, bear_thresh, scale_max):
-    if score >= bull_thresh:
-        room = scale_max - bull_thresh
-        progress = (score - bull_thresh) / room if room > 0 else 0.0
-    elif score <= bear_thresh:
-        room = bear_thresh
-        progress = (bear_thresh - score) / room if room > 0 else 0.0
-    else:
-        return "Low"
-    if progress < 0.33:
-        return "Low"
-    elif progress < 0.66:
-        return "Moderate"
-    return "High"
-
-macro_conf = confidence_label(macro_score, 5.5, 4.5, 10.0)
-swing_conf = confidence_label(swing_score, 52.0, 48.0, 100.0)
-micro_conf = confidence_label(micro_score, 55.0, 45.0, 100.0)
-
-macro_bull, macro_bear = macro_score >= 5.5, macro_score <= 4.5
-if macro_bull and micro_score <= 45.0:
-    exec_gate = "⚠️ Conflicting Bias — Macro Bullish, Micro Bearish (Diverging Timeframes)"
-elif macro_bear and micro_score >= 55.0:
-    exec_gate = "⚠️ Conflicting Bias — Macro Bearish, Micro Bullish (Diverging Timeframes)"
-elif macro_bull and swing_score >= 52.0 and micro_score >= 50.0:
-    exec_gate = f"🟢 Bullish Bias — Aligned Across Timeframes ({macro_conf} Confidence)"
-elif macro_bear and swing_score <= 48.0 and micro_score <= 48.0:
-    exec_gate = f"🔴 Bearish Bias — Aligned Across Timeframes ({macro_conf} Confidence)"
-elif macro_bull and swing_score <= 48.0 and micro_score <= 48.0:
-    exec_gate = "🟡 Bullish Macro, Bearish Near-Term (Possible Pullback)"
-elif macro_bear and swing_score >= 52.0 and micro_score >= 50.0:
-    exec_gate = "🟡 Bearish Macro, Bullish Near-Term (Possible Bounce)"
-else:
-    exec_gate = "⏳ No Clear Bias — Mixed Signals (Low Confidence)"
 
 # --- SIZING GUIDE (now grounded in this instance's own empirical Track
 # Record instead of a formula that treated an unrelated technical score as a
@@ -380,12 +342,6 @@ with st.container(border=True):
     ov_r2c2.metric("Sizing Guide*", kelly_display, help=sizing_help)
     st.caption("*Sizing Guide is based on this instance's own Track Record (empirical win rate and avg win/loss for the current Swing bias bucket) via quarter-Kelly — not a formula-derived guess. Still a small, instance-specific sample; not investment advice.")
 
-if "🟢" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bullish")
-elif "🔴" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "bearish")
-elif "⚠️" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "conflict")
-elif "🟡" in exec_gate: status_card(f"<b>Overall Bias:</b> {exec_gate}", "neutral")
-else: status_card(f"<b>Overall Bias:</b> {exec_gate}", "info")
-
 # ==========================================
 # PRICE CHART — the one thing every trading dashboard should lead with,
 # which this one didn't have until now
@@ -425,75 +381,20 @@ if price_chart_data:
         st.caption("Real hourly candles from Binance, same fetch that powers 7-Day Momentum on the Confluence Board below. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
 
 # ==========================================
-# SECTION 2: MULTI-TIMEFRAME MATRIX
+# MICRO SIGNAL — the one tier with a validated, calibrated edge
 # ==========================================
-render_header("🧠 Decision Matrix")
-col_macro, col_swing, col_micro = st.columns(3)
+render_header("🎯 Micro Signal (1-4 HRS) — The Actionable Timeframe")
+with st.container(border=True):
+    st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon. Note: R²=0.023 is a small, real, repeatable statistical tilt, not a strong individual prediction — see Track Record for what an edge this size looks like in realized win rates, and treat it as one input, not a certainty.")
+    micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
+    if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
+    elif "🔴" in micro_dir: bias_badge(micro_dir, "bearish")
+    else: bias_badge(micro_dir, "neutral")
+    st.metric("Micro Score", f"{micro_score} / 100")
+    micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
+    st.caption(f"**Rationale:** {micro_rat}")
 
-with col_macro:
-    with st.container(border=True):
-        st.markdown("**🌐 1. MACRO HORIZON (2-6 WKS)**")
-        st.caption("Blends DXY, 10Y yield, VIX, S&P 500, plus BTC's own trend.")
-        if macro_score >= 5.5: bias_badge(f"🐂 Bullish · {macro_conf} Confidence", "bullish")
-        elif macro_score <= 4.5: bias_badge(f"🐻 Bearish · {macro_conf} Confidence", "bearish")
-        else: bias_badge(f"Neutral / Choppy · {macro_conf} Confidence", "neutral")
-
-        ma_setups = setups.get("macro", {})
-        st.markdown(f"""
-        | Parameter | Target / Level |
-        | :--- | :--- |
-        | **Macro Score** | `{macro_score} / 10` |
-        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-        | **Conservative T1** | `${ma_setups.get('t1', 70000.00):,.2f}` |
-        | **Aggressive T2** | `${ma_setups.get('t2', 74000.00):,.2f}` |
-        | **Stop Loss (SL)** | `${ma_setups.get('sl', 58000.00):,.2f}` |
-        """)
-        macro_rat = insights.get('rationales', {}).get('macro', 'Awaiting live data...')
-        st.caption(f"**Rationale:** {macro_rat}")
-
-with col_swing:
-    with st.container(border=True):
-        st.markdown("**🔴 2. SWING TACTICAL (1-3 DAYS)**")
-        st.caption("Blends 24h price change, VWAP divergence, and funding rate.")
-        if swing_score >= 52.0: bias_badge(f"Bullish · {swing_conf} Confidence", "bullish")
-        elif swing_score <= 48.0: bias_badge(f"Bearish · {swing_conf} Confidence", "bearish")
-        else: bias_badge(f"Neutral / Choppy · {swing_conf} Confidence", "neutral")
-
-        sw_setups = setups.get("tactical", {})
-        st.markdown(f"""
-        | Parameter | Target / Level |
-        | :--- | :--- |
-        | **Swing Score** | `{swing_score} / 100` |
-        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-        | **Conservative T1** | `${sw_setups.get('t1', 63500.00):,.2f}` |
-        | **Aggressive T2** | `${sw_setups.get('t2', 62800.00):,.2f}` |
-        | **Stop Loss (SL)** | `${sw_setups.get('sl', 65411.00):,.2f}` |
-        """)
-        swing_rat = insights.get('rationales', {}).get('swing', 'Awaiting live data...')
-        st.caption(f"**Rationale:** {swing_rat}")
-
-with col_micro:
-    with st.container(border=True):
-        st.markdown("**🎯 3. MICRO STF (1-4 HRS)**")
-        st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon.")
-        micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
-
-        if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
-        elif "🔴" in micro_dir: bias_badge(micro_dir, "bearish")
-        else: bias_badge(micro_dir, "neutral")
-
-        mi_setups = setups.get("micro", {})
-        st.markdown(f"""
-        | Parameter | Target / Level |
-        | :--- | :--- |
-        | **Micro Score** | `{micro_score} / 100` |
-        | **Live Spot Exec** | `${LIVE_SPOT_PRICE:,.2f}` |
-        | **Conservative T1** | `${mi_setups.get('t1', 65000.00):,.2f}` |
-        | **Aggressive T2** | `${mi_setups.get('t2', 65411.00):,.2f}` |
-        | **Stop Loss (SL)** | `${mi_setups.get('sl', 63600.00):,.2f}` |
-        """)
-        micro_rat = insights.get('rationales', {}).get('micro', 'Awaiting live data...')
-        st.caption(f"**Rationale:** {micro_rat}")
+st.caption("Macro and Swing moved to the Confluence Board below — we tested composite scores for both against ~2 years of real data and found no reliable edge, so a bias badge and price-target table for them would have been presenting more confidence than the evidence supports.")
 
 # ==========================================
 # TRACK RECORD — does this signal actually work?
@@ -604,35 +505,6 @@ if calibration and calibration.get("fit_non_overlapping"):
             st.code("forward_return ≈ " + " ".join(formula_parts))
             if "coefficients" in fit_ov:
                 st.caption("For comparison, the (less trustworthy) overlapping-sample fit: " + ", ".join(f"{k}={v:+.4f}" for k, v in fit_ov["coefficients"].items()) + f", intercept={fit_ov.get('intercept', 0):+.4f}")
-
-# ==========================================
-# SECTION 3: SIGNAL SUMMARY
-# ==========================================
-if insights or telemetry:
-    render_header("📜 Signal Summary")
-
-    if "🟢" in exec_gate: sig_kind = "bullish"
-    elif "🔴" in exec_gate: sig_kind = "bearish"
-    elif "⚠️" in exec_gate: sig_kind = "conflict"
-    elif "🟡" in exec_gate: sig_kind = "neutral"
-    else: sig_kind = "info"
-
-    dynamic_thesis = insights.get('liquidity_thesis', 'Awaiting live session data.')
-    safe_guidance = insights.get('institutional_guidance', 'N/A')
-    status_card(f"🛡️ <b>Guidance:</b> {safe_guidance}<br>🧠 <b>Liquidity Thesis:</b> {dynamic_thesis}", sig_kind)
-
-# ==========================================
-# SECTION 4: RISK GATEWAY
-# ==========================================
-render_header("🛡️ Desk-Level Risk Gateway")
-
-blended_risk = round(((macro_score * 10) + swing_score + micro_score) / 3, 1)
-
-with st.container(border=True):
-    rg1, rg2, rg3 = st.columns(3)
-    rg1.metric("Risk Base Score", f"{blended_risk} / 100", help="Blended read across all three tiers (macro ×10, swing, micro, averaged). Higher = more bullish composite.")
-    rg2.metric("Upper Liq Wall", f"${upper_wall:,.0f}", help="Nearest large resting sell-side liquidity cluster above spot.")
-    rg3.metric("Lower Liq Wall", f"${lower_wall:,.0f}", help="Nearest large resting buy-side liquidity cluster below spot.")
 
 # ==========================================
 # SECTION 5: TELEMETRY & CHARTS
@@ -785,33 +657,3 @@ if confluence:
     )
     st.markdown(confluence.get("scenario_explanation", ""))
     st.caption(confluence.get("disclaimer", ""))
-
-# ==========================================
-# SECTION 6: QUANTITATIVE MARKET DATA & ANALYTICAL GUIDANCE
-# ==========================================
-if insights:
-    render_header("📝 Quantitative Market Data & Guidance")
-    vp_col, cat_col, guide_col = st.columns(3)
-
-    with vp_col:
-        with st.container(border=True):
-            st.markdown("**📊 Volume Profile**")
-            vp = insights.get("volume_profile", {})
-            st.write(f"- **Point of Control (POC):** {vp.get('poc', 'N/A')}")
-            st.write(f"- **Value Area High (VAH):** {vp.get('vah', 'N/A')}")
-            st.write(f"- **Value Area Low (VAL):** {vp.get('val', 'N/A')}")
-
-    with cat_col:
-        with st.container(border=True):
-            st.markdown("**⚠️ Upcoming Catalysts & Filters**")
-            for cat in insights.get("catalysts", []):
-                st.write(f"- {cat}")
-
-    with guide_col:
-        with st.container(border=True):
-            st.markdown("**🧭 Signal Interpretation**")
-            raw_action = insights.get("action_plan", "Scores are near neutral across timeframes right now.")
-            action_plan_clean = raw_action.replace("*", "").replace("  ", " ").replace("$", "\\$")
-            tone = insights.get("action_plan_tone", "info")
-            kind_map = {"conflict": "conflict", "bullish": "bullish", "bearish": "bearish", "neutral": "neutral"}
-            status_card(action_plan_clean, kind_map.get(tone, "info"))
