@@ -8,7 +8,7 @@ from streamlit_autorefresh import st_autorefresh
 # --- CONFIGURATION ---
 API_URL = "https://quant-desk-backend-rata.onrender.com/api/v1"
 HEATMAP_HISTORY_LEN_FALLBACK = 30  # mirrors backend's HEATMAP_HISTORY_LEN; used only if a payload predates this field
-st.set_page_config(page_title="Quant Desk Multi-Timeframe Terminal", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Micro Edge Terminal", page_icon="⚡", layout="wide", initial_sidebar_state="expanded")
 
 # --- CUSTOM CSS ---
 st.markdown("""
@@ -39,15 +39,18 @@ td { font-size: 0.95rem; border-bottom: 1px solid #222 !important; padding: 6px 
 # Two-tier visual language for bias/signal content (kept separate from native
 # st.success/error/warning/info, which stay reserved for real system states
 # like "backend unreachable" so those don't get visually diluted):
-#   - bias_badge: small inline chip, for per-item bias tags (Decision Matrix)
+#   - bias_badge: small inline chip, for per-item bias tags
 #   - status_card: dark card with a colored left border, for section-level
-#     summaries (squeeze risk, overall bias, guidance) -- restrained compared
-#     to a full bright alert fill, but still color-coded for a quick scan.
+#     summaries -- restrained compared to a full bright alert fill, but
+#     still color-coded for a quick scan.
 def bias_badge(text, kind):
     st.markdown(f'<span class="bias-badge bias-{kind}">{text}</span>', unsafe_allow_html=True)
 
 def status_card(html, kind="info"):
     st.markdown(f'<div class="status-card {kind}">{html}</div>', unsafe_allow_html=True)
+
+def render_header(title):
+    st.markdown(f"<h4 style='color: #E0E0E0; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 40px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;'>{title}</h4>", unsafe_allow_html=True)
 
 st_autorefresh(interval=60000, key="data_refresh")
 
@@ -88,7 +91,6 @@ with st.sidebar:
     st.markdown("<h3 style='margin-bottom:20px;'>⚙️ Terminal Controls</h3>", unsafe_allow_html=True)
     st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>🌐 Global Plumbing</h5>", unsafe_allow_html=True)
 
-
     pl1, pl2 = st.columns(2)
     dxy_raw = plumbing.get("dxy", {})
     sp500_raw = plumbing.get("sp500", {})
@@ -101,52 +103,41 @@ with st.sidebar:
     vix = vix_raw if isinstance(vix_raw, dict) else {"value": vix_raw, "delta": "0.0"}
 
     with pl1:
-        st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Feeds Macro Score directly now. Up is bearish for crypto.")
-        st.metric("S&P 500", sp500.get("value", "5,200"), sp500.get("delta", "+45"), delta_color="normal", help="Global equity correlation. Feeds Macro Score directly now. Up is bullish for crypto.")
+        st.metric("DXY Index", dxy.get("value", "104.20"), dxy.get("delta", "-0.15"), delta_color="inverse", help="US Dollar strength. Historically a mild headwind for crypto when rising. See Macro Conditions below for the full picture.")
+        st.metric("S&P 500", sp500.get("value", "5,200"), sp500.get("delta", "+45"), delta_color="normal", help="Global equity correlation. Historically a mild tailwind for crypto when rising. See Macro Conditions below for the full picture.")
     with pl2:
-        st.metric("US 10Y Yield", us10y.get("value", "4.25%"), us10y.get("delta", "+0.02"), delta_color="inverse", help="Risk-free rate. Feeds Macro Score directly now. Up is bearish for crypto.")
-        st.metric("VIX", vix.get("value", "14.50"), vix.get("delta", "-0.50"), delta_color="inverse", help="Market fear gauge. Feeds Macro Score directly now. Up is bearish for crypto.")
+        st.metric("US 10Y Yield", us10y.get("value", "4.25%"), us10y.get("delta", "+0.02"), delta_color="inverse", help="Risk-free rate. Historically a mild headwind for crypto when rising. See Macro Conditions below for the full picture.")
+        st.metric("VIX", vix.get("value", "14.50"), vix.get("delta", "-0.50"), delta_color="inverse", help="Market fear gauge. The one cross-asset input with a validated, tested link to Bitcoin's 4h moves -- see the Micro Signal card for the actual evidence.")
 
-    st.caption("🟢 Bullish Signal | 🔴 Bearish Signal — all four now feed the Macro Score directly.")
+    st.caption("Live reference values, shown for context -- not inputs to any trading bias except where the Micro Signal card explicitly says so.")
     st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
-    st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>💼 Active Trade Manager</h5>", unsafe_allow_html=True)
+    st.markdown("<h5 style='color:#8892B0; margin-bottom:10px;'>💼 Trade Tracker</h5>", unsafe_allow_html=True)
+    st.caption("A simple PnL calculator for a trade you're already in -- not tied to any signal on this page. Useful for any position, on any timeframe.")
 
-    col_t1, col_t2 = st.columns(2)
-    with col_t1: track_macro = st.toggle("🟢 Macro", value=True)
-    with col_t2: track_swing = st.toggle("🔴 Swing", value=True)
-    st.markdown("<hr style='border:1px solid #333; margin: 20px 0;'>", unsafe_allow_html=True)
-
-    if not track_macro and not track_swing: st.info("No active trades selected.")
-
-    if track_macro:
-        with st.expander("🟢 MACRO: Active Long", expanded=True):
-            macro_entry = st.number_input("Entry Price ($)", value=63177.84, step=10.0, key="m_entry")
-            macro_collat = st.number_input("Collateral ($)", value=10000.00, step=100.0, key="m_col")
-            macro_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="m_lev")
-            if macro_entry > 0:
-                macro_roi = ((LIVE_SPOT_PRICE - macro_entry) / macro_entry) * macro_lev * 100
-                macro_pnl = (macro_roi / 100) * macro_collat
-                pnl_color = "#00E676" if macro_pnl >= 0 else "#FF3366"
-                pnl_sign = "+" if macro_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}&#36;{macro_pnl:,.2f} ({pnl_sign}{macro_roi:,.2f}%)</h4>", unsafe_allow_html=True)
-
-    if track_swing:
-        with st.expander("🔴 SWING: Active Short", expanded=True):
-            swing_entry = st.number_input("Entry Price ($)", value=63993.00, step=10.0, key="s_entry")
-            swing_collat = st.number_input("Collateral ($)", value=344.00, step=100.0, key="s_col")
-            swing_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=15.0, step=0.5, key="s_lev")
-            if swing_entry > 0:
-                swing_roi = ((swing_entry - LIVE_SPOT_PRICE) / swing_entry) * swing_lev * 100
-                swing_pnl = (swing_roi / 100) * swing_collat
-                pnl_color_s = "#00E676" if swing_pnl >= 0 else "#FF3366"
-                pnl_sign_s = "+" if swing_pnl >= 0 else ""
-                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>Live PnL:</p><h4 style='color:{pnl_color_s}; margin-top:0;'>{pnl_sign_s}&#36;{swing_pnl:,.2f} ({pnl_sign_s}{swing_roi:,.2f}%)</h4>", unsafe_allow_html=True)
+    track_trade = st.toggle("Track a position", value=False)
+    if track_trade:
+        with st.expander("Position", expanded=True):
+            trade_label = st.text_input("Label (optional)", value="", placeholder="e.g. BTC long", key="trade_label")
+            trade_side = st.radio("Side", ["Long", "Short"], horizontal=True, key="trade_side")
+            trade_entry = st.number_input("Entry Price ($)", value=float(round(LIVE_SPOT_PRICE)), step=10.0, key="trade_entry")
+            trade_collat = st.number_input("Collateral ($)", value=1000.00, step=100.0, key="trade_collat")
+            trade_lev = st.slider("Leverage", min_value=1.0, max_value=50.0, value=5.0, step=0.5, key="trade_lev")
+            if trade_entry > 0:
+                if trade_side == "Long":
+                    trade_roi = ((LIVE_SPOT_PRICE - trade_entry) / trade_entry) * trade_lev * 100
+                else:
+                    trade_roi = ((trade_entry - LIVE_SPOT_PRICE) / trade_entry) * trade_lev * 100
+                trade_pnl = (trade_roi / 100) * trade_collat
+                pnl_color = "#00E676" if trade_pnl >= 0 else "#FF3366"
+                pnl_sign = "+" if trade_pnl >= 0 else ""
+                label_prefix = f"{trade_label} — " if trade_label else ""
+                st.markdown(f"<p style='margin-bottom:2px; color:#8892B0;'>{label_prefix}Live PnL:</p><h4 style='color:{pnl_color}; margin-top:0;'>{pnl_sign}&#36;{trade_pnl:,.2f} ({pnl_sign}{trade_roi:,.2f}%)</h4>", unsafe_allow_html=True)
 
 # --- HEADER & DATA QUALITY BANNER ---
 header_col1, header_col2 = st.columns([5, 1])
 with header_col1:
-    st.markdown("<h2 style='margin-bottom:0;'>⚡ QUANT DESK TERMINAL</h2>", unsafe_allow_html=True)
-    st.caption("Multi-Timeframe Bias & Signal Dashboard")
+    st.markdown("<h2 style='margin-bottom:0;'>⚡ MICRO EDGE TERMINAL</h2>", unsafe_allow_html=True)
+    st.caption("A validated 1-4H Bitcoin signal, backed by real statistical testing — plus live macro context for the bigger picture.")
 with header_col2:
     with st.popover("⚙️ Settings"):
         st.markdown("**API Connection**")
@@ -155,8 +146,10 @@ with header_col2:
             st.rerun()
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.caption("Everything below is the research toolkit that validated the Micro Signal, and that keeps testing whether Swing or Macro timeframes ever earn one too. Read-only unless noted -- nothing here silently changes the live formula.")
+
         st.markdown("**📈 Bootstrap Track Record**")
-        st.caption("Seeds the Track Record from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data. 24 months is recommended — Macro's 14-day horizon needs a longer window to build enough non-overlapping samples per bucket.")
+        st.caption("Seeds Micro's evidence base from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data.")
         bt_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="bt_months")
         if st.button("Run Historical Backtest"):
             with st.spinner("Fetching historical data and reconstructing scores — this can take a minute..."):
@@ -176,8 +169,8 @@ with header_col2:
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**🔬 Factor Research**")
-        st.caption("Tests each raw input against real forward returns, independently — now 14 features: the original 8 (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P) plus order-flow imbalance, 3/7/14-day momentum, and volatility regime, added to give Swing and Macro's own horizons a fairer test. Read-only: never changes the live formulas by itself.")
-        st.caption("Window now goes up to 90 months (Binance BTCUSDT perpetuals have traded since ~2019) instead of 36 — this directly targets the 14d/Macro sample-size problem (only ~25-52 independent windows at 24 months). Longer windows take proportionally longer to fetch; pagination is sequential, so expect several minutes near the upper end, not seconds.")
+        st.caption("Tests each raw input against real forward returns, independently — 16 features (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P, order-flow imbalance, 3/7/14-day momentum, volatility regime, MACD histogram, MA crossover) across 4h/2d/14d. Read-only: never changes the live formula by itself.")
+        st.caption("Window goes up to 90 months (Binance BTCUSDT perpetuals have traded since ~2019). Longer windows take proportionally longer to fetch and use more memory -- if a very long run doesn't come back, try a shorter window before assuming something's broken.")
         fr_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="fr_months")
         if st.button("Run Factor Research"):
             with st.spinner("Reconstructing feature history and testing correlations — this can take a minute..."):
@@ -212,12 +205,6 @@ with header_col2:
                 except Exception as e:
                     cal_result = {"status": "error", "error": str(e)}
             if cal_result.get("status") == "completed" and "error" in cal_result:
-                # run_calibration validates horizon/feature names BEFORE fetching
-                # any data and returns a TOP-LEVEL error in that case, not one
-                # nested inside fit_non_overlapping -- e.g. a typo'd feature name.
-                # Endpoint status is still "completed" since the function returned
-                # normally rather than raising, so this must be checked explicitly
-                # or it silently falls through to a fake success with None values.
                 st.error(f"Calibration couldn't run: {cal_result['error']}")
             elif cal_result.get("status") == "completed":
                 st.session_state["last_calibration"] = cal_result
@@ -235,7 +222,7 @@ with header_col2:
         st.markdown("**🔬 Out-of-Sample Test**")
         st.caption("A stronger, different check than Calibrate Formula above: fits ONLY on the earlier portion of the window, then tests that frozen formula on the later portion it never saw. Calibrate Formula checks whether a coefficient looks similar when refit on more blended data (replication); this checks whether the formula actually predicts anything on genuinely unseen data (prediction). Out-of-sample R² can come back negative — that's a real result, not an error.")
         oos_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="oos_horizon")
-        oos_features = st.text_input("Features (comma-separated)", value="atr_pct_14h", key="oos_features")
+        oos_features = st.text_input("Features (comma-separated)", value="vix_pct,spx_pct", key="oos_features")
         oos_months = st.number_input("Months of history", min_value=1, max_value=90, value=48, step=1, key="oos_months")
         oos_train_frac = st.slider("Train fraction (earlier portion used for fitting)", min_value=0.3, max_value=0.9, value=0.7, step=0.05, key="oos_train_frac")
         if st.button("Run Out-of-Sample Test"):
@@ -287,133 +274,24 @@ else:
     else:
         st.markdown(f"<span class='live-badge'>🟢 ALL FEEDS LIVE</span> &nbsp; {freshness}", unsafe_allow_html=True)
 
-# --- Wall/CVD reference values, used by the price chart and heatmap below.
-# (The Squeeze Risk banner that used to live here was removed -- Magnitude
-# Research showed funding extremity does NOT robustly predict bigger moves
-# at any tested horizon, so presenting it as a prominent risk alarm implied
-# more confidence than the evidence supports. Funding rate itself is still
-# shown, with real data and honest context, in Macro Conditions below.) ---
+# --- Wall/CVD reference values, used by Volatility Guardrail, the price
+# chart, and the heatmap further down. ---
 hm_data = telemetry.get("orderbook_heatmap", {})
 upper_wall = hm_data.get("upper_wall", 65411) if hm_data else 65411
 lower_wall = hm_data.get("lower_wall", 61582) if hm_data else 61582
 ny_cvd_raw = telemetry.get("session_cvd", {}).get("new_york", {}).get("cvd", "")
 
-# --- VOLATILITY GUARDRAIL — built from what Magnitude Research actually
-# validated at 4h (Micro's horizon), not from an assumption. THREE signals
-# robustly predicted bigger subsequent moves on n=2,153 independent
-# windows: ATR (r=+0.263), 24h momentum extremity (r=+0.172), and VIX
-# extremity (r=+0.163) -- the strongest, most trustworthy results in that
-# whole test. This is a magnitude warning, not a direction call: it says
-# "expect a bigger swing," not "expect it to go up or down."
-atr_pct_val = ta.get("atr_pct", 0.01)
-vix_pct_val = plumbing.get("vix", {}).get("pct_change", 0.0) if isinstance(plumbing.get("vix"), dict) else 0.0
-momentum_24h_val = telemetry.get("deltas", {}).get("spot_pct_24h") or 0.0
-
-atr_elevated = atr_pct_val > 0.015
-vix_elevated = abs(vix_pct_val) > 3.0
-momentum_elevated = abs(momentum_24h_val) > 4.0
-elevated_count = sum([atr_elevated, vix_elevated, momentum_elevated])
-
-elevated_labels = []
-if atr_elevated: elevated_labels.append(f"ATR {atr_pct_val*100:.2f}%")
-if vix_elevated: elevated_labels.append(f"VIX {vix_pct_val:+.2f}%")
-if momentum_elevated: elevated_labels.append(f"24h move {momentum_24h_val:+.2f}%")
-
-if elevated_count >= 2:
-    status_card(f"🌪️ <b>High Volatility Regime</b> · {elevated_count} of 3 validated signals elevated: {', '.join(elevated_labels)} · All three (ATR r=+0.263, 24h momentum r=+0.172, VIX r=+0.163, all robust on n=2,153) predicted bigger 4h moves. Expect wider swings in either direction; size and stops accordingly, not just directional bias.", "conflict")
-elif elevated_count == 1:
-    status_card(f"⚠️ <b>Elevated Volatility Signal</b> · {elevated_labels[0]} · A validated 4h magnitude predictor on its own. Bigger-than-usual moves are somewhat more likely in either direction over the next few hours.", "neutral")
-else:
-    status_card(f"✅ <b>Normal Volatility Regime</b> · 1H ATR: {atr_pct_val*100:.2f}% · VIX move: {vix_pct_val:+.2f}% · 24h move: {momentum_24h_val:+.2f}% · None of the three validated magnitude signals are elevated right now.", "info")
-
-def render_header(title):
-    st.markdown(f"<h4 style='color: #E0E0E0; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 40px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px;'>{title}</h4>", unsafe_allow_html=True)
-
-with st.expander("📖 Glossary — What These Terms Mean"):
-    st.markdown("""
-- **RSI (Relative Strength Index)**: measures how fast and how far price has moved recently, on a 0–100 scale. Above ~70 is often called "overbought," below ~30 "oversold" — but in a strong trend it can stay extreme for a while, so it's a momentum gauge, not a timing signal on its own.
-- **VWAP (Volume-Weighted Average Price)**: the average price paid so far this session, weighted by how much volume traded at each price. Traders use it as a reference line — price above VWAP is generally read as buyers in control, below as sellers in control.
-- **Funding Rate**: a periodic payment between long and short perpetual-futures traders that keeps the futures price tethered to spot. Persistently positive funding means longs are paying shorts (crowded long positioning); negative means the reverse.
-- **Open Interest (OI)**: the total number of outstanding futures/options contracts that haven't been closed. Rising OI alongside a price move suggests new money entering the trend; falling OI suggests positions closing out.
-- **CVD (Cumulative Volume Delta)**: running total of aggressive buy volume minus aggressive sell volume. Positive CVD means market buy orders are outweighing market sells.
-- **Liquidity Heatmap / Order Book Walls**: visualizes where large buy or sell orders are sitting in the order book. Thick clusters ("walls") are levels the market has to absorb to keep moving through.
-- **Implied Volatility (IV) Skew**: how options-market-priced volatility differs across strike prices for a given expiry. A steep skew toward downside strikes usually reflects more hedging demand against a drop.
-- **Volume Profile (POC / VAH / VAL)**: POC (Point of Control) is the price level with the most traded volume; VAH/VAL (Value Area High/Low) bound the range where most volume traded. These are reference levels, not predictions.
-- **Network Activity**: real, live Bitcoin network data (mempool backlog, fee pressure) — a proxy for on-chain demand, not exchange-specific buying/selling flow (that requires a paid data provider this app doesn't currently use).
-""")
-
 # ==========================================
-# SECTION 1: LIVE MARKET OVERVIEW
+# MICRO SIGNAL — the headline of this tool. The one tier with a validated,
+# calibrated, out-of-sample-tested edge (see Settings -> Out-of-Sample
+# Test for the actual proof). Carries its own evidence -- significance
+# test, per-bucket win rates, sample sizes -- so it's a complete,
+# self-contained case for why this specific number should be trusted at
+# all, not just a score with no receipts.
 # ==========================================
-render_header("📊 Live Market Overview")
-deltas = telemetry.get("deltas", {})
+render_header("🎯 Micro Signal (1-4 HRS)")
 with st.container(border=True):
-    ov_r1c1, ov_r1c2, ov_r1c3, ov_r1c4 = st.columns(4)
-    spot_delta = deltas.get("spot_pct_24h")
-    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
-                    delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
-    rsi_delta = deltas.get("rsi_1h")
-    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}",
-                    delta=f"{rsi_delta:+.1f} (1h)" if rsi_delta is not None else None,
-                    help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
-    vwap_delta = deltas.get("vwap_1h_pct")
-    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
-                    delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
-                    help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
-    oi_delta = deltas.get("oi_1h_pct")
-    ov_r1c4.metric("Open Interest", OPEN_INTEREST,
-                    delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
-                    help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
-
-# ==========================================
-# PRICE CHART — the one thing every trading dashboard should lead with,
-# which this one didn't have until now
-# ==========================================
-price_chart_data = telemetry.get("price_chart", [])
-if price_chart_data:
-    render_header("📈 BTC/USD — Last 8 Days (1H)")
-    with st.container(border=True):
-        times = [datetime.fromtimestamp(p["t"], tz=timezone.utc) for p in price_chart_data]
-        opens = [p["o"] for p in price_chart_data]
-        highs = [p["h"] for p in price_chart_data]
-        lows = [p["l"] for p in price_chart_data]
-        closes = [p["c"] for p in price_chart_data]
-
-        fig_price = go.Figure(data=go.Candlestick(
-            x=times, open=opens, high=highs, low=lows, close=closes,
-            increasing_line_color="#00E676", decreasing_line_color="#FF3366",
-            increasing_fillcolor="#00E676", decreasing_fillcolor="#FF3366",
-            name="BTC/USD",
-        ))
-        vwap_val = ta.get("vwap", LIVE_SPOT_PRICE)
-        fig_price.add_hline(y=vwap_val, line_dash="dot", line_color="#00FFCC", line_width=1.5,
-                             annotation_text=f"Session VWAP ${vwap_val:,.0f}", annotation_font=dict(color="#00FFCC", size=11))
-        fig_price.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
-                             annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=10), opacity=0.6)
-        fig_price.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
-                             annotation_text="Lower Wall", annotation_font=dict(color="#00E676", size=10), opacity=0.6)
-        fig_price.update_layout(
-            height=420, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"), rangeslider=dict(visible=False), automargin=True),
-            yaxis=dict(title=dict(text="Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f",
-                       showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#8892B0"), automargin=True),
-            showlegend=False,
-        )
-        st.plotly_chart(fig_price, use_container_width=True)
-        st.caption("Real hourly candles from Binance, same fetch that powers 7-Day Momentum on the Confluence Board below. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
-
-# ==========================================
-# MICRO SIGNAL — the one tier with a validated, calibrated edge. This is
-# the single trading-bias source on this dashboard right now, so it also
-# carries the evidence that used to live in a separate Track Record
-# section: the significance test, per-bucket win rates, and sample sizes.
-# Macro/Swing get informational treatment only (see Macro Conditions
-# below) until they clear the same bar.
-# ==========================================
-render_header("🎯 Micro Signal (1-4 HRS) — The Actionable Timeframe")
-with st.container(border=True):
-    st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon. R²=0.023 is a small, real, repeatable statistical tilt, not a strong individual prediction — the evidence below shows what an edge this size looks like in realized outcomes.")
+    st.caption("Calibrated regression on VIX + S&P 500 (real fit, n=4,313 non-overlapping windows, R²=0.023, confirmed via independent out-of-sample testing) — RSI and VWAP divergence were tested and dropped after showing no significant edge at this horizon. R²=0.023 is a small, real, repeatable statistical tilt, not a strong individual prediction — the evidence below shows what an edge this size looks like in realized outcomes.")
     micro_dir = insights.get('rationales', {}).get('micro_directive', '⏳ NEUTRAL / CHOP')
     if "🟢" in micro_dir: bias_badge(micro_dir, "bullish")
     elif "🔴" in micro_dir: bias_badge(micro_dir, "bearish")
@@ -479,8 +357,72 @@ with st.container(border=True):
     sz_col1.metric("Sizing Guide*", kelly_display, help=sizing_help)
     st.caption("*Quarter-Kelly sizing grounded in this instance's own empirical Micro track record (real observed win rate and avg win/loss) — not a formula-derived guess. Still a small, instance-specific sample; not investment advice.")
 
-st.caption("Macro and Swing are shown as informational Macro Conditions below, not a trading bias — we tested composite scores for both against ~2 years of real data and found no reliable edge (see Factor Research in Settings).")
+# ==========================================
+# VOLATILITY GUARDRAIL — built from what Magnitude Research actually
+# validated at 4h (Micro's horizon), not from an assumption. THREE signals
+# robustly predicted bigger subsequent moves on n=2,153 independent
+# windows: ATR (r=+0.263), 24h momentum extremity (r=+0.172), and VIX
+# extremity (r=+0.163) -- the strongest, most trustworthy results in that
+# whole test. This is a magnitude warning, not a direction call: it says
+# "expect a bigger swing," not "expect it to go up or down."
+# ==========================================
+atr_pct_val = ta.get("atr_pct", 0.01)
+vix_pct_val = plumbing.get("vix", {}).get("pct_change", 0.0) if isinstance(plumbing.get("vix"), dict) else 0.0
+momentum_24h_val = telemetry.get("deltas", {}).get("spot_pct_24h") or 0.0
 
+atr_elevated = atr_pct_val > 0.015
+vix_elevated = abs(vix_pct_val) > 3.0
+momentum_elevated = abs(momentum_24h_val) > 4.0
+elevated_count = sum([atr_elevated, vix_elevated, momentum_elevated])
+
+elevated_labels = []
+if atr_elevated: elevated_labels.append(f"ATR {atr_pct_val*100:.2f}%")
+if vix_elevated: elevated_labels.append(f"VIX {vix_pct_val:+.2f}%")
+if momentum_elevated: elevated_labels.append(f"24h move {momentum_24h_val:+.2f}%")
+
+if elevated_count >= 2:
+    status_card(f"🌪️ <b>High Volatility Regime</b> · {elevated_count} of 3 validated signals elevated: {', '.join(elevated_labels)} · All three (ATR r=+0.263, 24h momentum r=+0.172, VIX r=+0.163, all robust on n=2,153) predicted bigger 4h moves. Expect wider swings in either direction; size and stops accordingly, not just directional bias.", "conflict")
+elif elevated_count == 1:
+    status_card(f"⚠️ <b>Elevated Volatility Signal</b> · {elevated_labels[0]} · A validated 4h magnitude predictor on its own. Bigger-than-usual moves are somewhat more likely in either direction over the next few hours.", "neutral")
+else:
+    status_card(f"✅ <b>Normal Volatility Regime</b> · 1H ATR: {atr_pct_val*100:.2f}% · VIX move: {vix_pct_val:+.2f}% · 24h move: {momentum_24h_val:+.2f}% · None of the three validated magnitude signals are elevated right now.", "info")
+
+# ==========================================
+# PRICE CHART
+# ==========================================
+price_chart_data = telemetry.get("price_chart", [])
+if price_chart_data:
+    render_header("📈 BTC/USD — Last 8 Days (1H)")
+    with st.container(border=True):
+        times = [datetime.fromtimestamp(p["t"], tz=timezone.utc) for p in price_chart_data]
+        opens = [p["o"] for p in price_chart_data]
+        highs = [p["h"] for p in price_chart_data]
+        lows = [p["l"] for p in price_chart_data]
+        closes = [p["c"] for p in price_chart_data]
+
+        fig_price = go.Figure(data=go.Candlestick(
+            x=times, open=opens, high=highs, low=lows, close=closes,
+            increasing_line_color="#00E676", decreasing_line_color="#FF3366",
+            increasing_fillcolor="#00E676", decreasing_fillcolor="#FF3366",
+            name="BTC/USD",
+        ))
+        vwap_val = ta.get("vwap", LIVE_SPOT_PRICE)
+        fig_price.add_hline(y=vwap_val, line_dash="dot", line_color="#00FFCC", line_width=1.5,
+                             annotation_text=f"Session VWAP ${vwap_val:,.0f}", annotation_font=dict(color="#00FFCC", size=11))
+        fig_price.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1,
+                             annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=10), opacity=0.6)
+        fig_price.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1,
+                             annotation_text="Lower Wall", annotation_font=dict(color="#00E676", size=10), opacity=0.6)
+        fig_price.update_layout(
+            height=420, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=False, tickfont=dict(color="#8892B0"), rangeslider=dict(visible=False), automargin=True),
+            yaxis=dict(title=dict(text="Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f",
+                       showgrid=True, gridcolor="rgba(255,255,255,0.05)", tickfont=dict(color="#8892B0"), automargin=True),
+            showlegend=False,
+        )
+        st.plotly_chart(fig_price, use_container_width=True)
+        st.caption("Real hourly candles from Binance. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
 
 # --- Factor Research report (only shown after a run this session) ---
 research_report = st.session_state.get("last_research_report")
@@ -557,12 +499,6 @@ if oos_result and oos_result.get("train_fit"):
             oos_col1.metric("In-sample R² (training portion)", f"{in_sample_r2}")
             oos_col2.metric("Out-of-sample R² (held-out portion)", f"{oos_r2}")
 
-            # Verdict is driven primarily by whether the held-out correlation
-            # is actually statistically significant -- NOT just whether OOS R²
-            # retains some fraction of in-sample R². A positive R² ratio can
-            # happen from noise alone at these sample sizes; significance is
-            # the real bar. Getting this backwards was the exact overclaim
-            # this whole tool exists to prevent.
             if oos_r2 is None:
                 verdict_kind, verdict = "info", "Not enough held-out data to draw a conclusion."
             elif oos_r2 <= 0:
@@ -575,138 +511,56 @@ if oos_result and oos_result.get("train_fit"):
             if corr:
                 st.caption(f"Predicted-vs-actual correlation on the held-out set: r={corr.get('r')}, n={corr.get('n')}, {'significant' if corr_significant else 'not significant'} — this significance test is what the verdict above is actually based on.")
 
+with st.expander("📖 Glossary — What These Terms Mean"):
+    st.markdown("""
+- **RSI (Relative Strength Index)**: measures how fast and how far price has moved recently, on a 0–100 scale. Above ~70 is often called "overbought," below ~30 "oversold" — but in a strong trend it can stay extreme for a while, so it's a momentum gauge, not a timing signal on its own.
+- **VWAP (Volume-Weighted Average Price)**: the average price paid so far this session, weighted by how much volume traded at each price. Traders use it as a reference line — price above VWAP is generally read as buyers in control, below as sellers in control.
+- **Funding Rate**: a periodic payment between long and short perpetual-futures traders that keeps the futures price tethered to spot. Persistently positive funding means longs are paying shorts (crowded long positioning); negative means the reverse.
+- **Open Interest (OI)**: the total number of outstanding futures/options contracts that haven't been closed. Rising OI alongside a price move suggests new money entering the trend; falling OI suggests positions closing out.
+- **CVD (Cumulative Volume Delta)**: running total of aggressive buy volume minus aggressive sell volume. Positive CVD means market buy orders are outweighing market sells.
+- **Liquidity Heatmap / Order Book Walls**: visualizes where large buy or sell orders are sitting in the order book. Thick clusters ("walls") are levels the market has to absorb to keep moving through.
+- **Implied Volatility (IV) Skew**: how options-market-priced volatility differs across strike prices for a given expiry. A steep skew toward downside strikes usually reflects more hedging demand against a drop.
+- **Network Activity**: real, live Bitcoin network data (mempool backlog, fee pressure) — a proxy for on-chain demand, not exchange-specific buying/selling flow (that requires a paid data provider this app doesn't currently use).
+- **Out-of-Sample Testing**: fitting a formula on only part of the historical data, then checking whether it actually predicts the remaining part it never saw. The strongest check this tool has for telling a real relationship apart from one that just happened to fit its own training data.
+""")
+
 # ==========================================
-# SECTION 5: TELEMETRY & CHARTS
+# MARKET OVERVIEW — supporting live data
 # ==========================================
-render_header("🔬 Telemetry & Liquidity")
-if not telemetry:
-    st.caption("Telemetry unavailable while the backend is unreachable (see banner above).")
-else:
-    session_info = telemetry.get("session_cvd", {})
-    cvd_help = "Cumulative Volume Delta: running total of aggressive buy volume minus sell volume for this session. Positive means market buys are outweighing market sells."
-    with st.container(border=True):
-        sc1, sc2, sc3 = st.columns(3)
-        with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""), help=cvd_help)
-        with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""), help=cvd_help)
-        with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""), help=cvd_help)
-    st.caption("Known limitation: sessions are bucketed by hour-of-day across a rolling 24h window, so whichever session is currently in progress shows a partial read rather than a full prior session. Not yet fixed — flagged here rather than presented as directly comparable.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    viz_col1, viz_col2 = st.columns([2, 1])
-    CHART_HEIGHT = 480  # shared by both charts so they align edge-to-edge
-
-    with viz_col1:
-      with st.container(border=True):
-        st.markdown("**🗺️ Order Book Liquidity Heatmap**")
-        z_matrix = hm_data.get("z_matrix", []) if hm_data else []
-        snapshots_collected = hm_data.get("snapshots_collected", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else 0
-        snapshots_total = hm_data.get("snapshots_total", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else HEATMAP_HISTORY_LEN_FALLBACK
-        MIN_SNAPSHOTS_TO_RENDER = 10
-
-        if len(z_matrix) > 0 and snapshots_collected >= MIN_SNAPSHOTS_TO_RENDER:
-            try:
-                z_array = np.array(z_matrix, dtype=float)
-                time_steps = hm_data.get("time_steps", [])
-                prices = hm_data.get("prices", [])
-
-                valid_vals = z_array[z_array > 0]
-                z_max = float(np.percentile(valid_vals, 98)) if valid_vals.size > 0 else 10.0
-                if z_max <= 0:
-                    z_max = 10.0
-
-                # Brand-matched teal gradient (near-black -> navy -> teal -> near-white)
-                # instead of a rainbow scale, so heavier liquidity clusters read as
-                # brighter/hotter without the visual noise of a multi-hue palette.
-                teal_colorscale = [
-                    [0.0, "#0A0E17"],
-                    [0.20, "#0F2A3D"],
-                    [0.45, "#0E7490"],
-                    [0.70, "#00C2CC"],
-                    [0.88, "#26FFDE"],
-                    [1.0, "#F0FFFC"],
-                ]
-
-                # Thin the x-axis ticks so 30 snapshot labels don't crowd the axis.
-                tick_idx = list(range(0, len(time_steps), 5)) if time_steps else []
-                tick_vals = [time_steps[i] for i in tick_idx]
-
-                fig_heatmap = go.Figure(data=go.Heatmap(
-                    z=z_array, x=time_steps if time_steps else None, y=prices if prices else None,
-                    colorscale=teal_colorscale, showscale=True, zmin=0.0, zmax=z_max,
-                    zsmooth=False,  # crisp cells -- smoothing blurred zero/real-value boundaries
-                    hovertemplate="Price: $%{y:,.0f}<br>Depth: %{z:.2f}<br>%{x}<extra></extra>",
-                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0")),
-                    xgap=1, ygap=1,  # thin gaps between cells read as a grid, not a blob
-                ))
-                fig_heatmap.update_layout(
-                    height=CHART_HEIGHT, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0"), automargin=True),
-                    xaxis=dict(title=dict(text="Snapshots (Older → Newer)", font=dict(color="#8892B0")), showgrid=False, tickfont=dict(color="#8892B0"), tickmode="array", tickvals=tick_vals, ticktext=tick_vals, automargin=True),
-                )
-                fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1.5, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=11))
-                fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1.5, annotation_text="Lower Support", annotation_font=dict(color="#00E676", size=11))
-                fig_heatmap.add_hline(y=LIVE_SPOT_PRICE, line_dash="solid", line_color="#F5F5F5", line_width=1, opacity=0.55, annotation_text="Spot", annotation_font=dict(color="#F5F5F5", size=11), annotation_position="left")
-                st.plotly_chart(fig_heatmap, use_container_width=True)
-                st.caption("Price axis is a fixed grid that only shifts when spot trades outside it. Cells are shown unsmoothed so bucket boundaries stay accurate.")
-            except Exception:
-                st.info("🗺️ Heatmap rendering matrix...")
-        elif len(z_matrix) > 0:
-            # Grid just reset (spot moved outside its previous range) -- rather
-            # than render a chart that's mostly still-empty padding (which reads
-            # as broken), show an honest progress state until there's enough
-            # real data for the picture to be meaningful.
-            st.info(f"🗺️ Rebuilding after a price move — collecting snapshot {snapshots_collected}/{snapshots_total}. The grid resets when spot trades outside its current range.")
-        else:
-            st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
-
-    with viz_col2:
-      with st.container(border=True):
-        st.markdown("**📉 Deribit Volatility Skew**")
-        vs_data = telemetry.get("volatility_skew", {})
-        strike_vals = vs_data.get("strikes", [])
-        iv_vals = vs_data.get("iv_surface", [])
-        expiry_label = vs_data.get("expiry", "N/A")
-
-        if len(strike_vals) > 0 and len(iv_vals) > 0:
-            fig_skew = go.Figure()
-            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
-            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
-            fig_skew.update_layout(
-                height=CHART_HEIGHT, margin=dict(l=10, r=10, t=20, b=10), template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True),
-                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True)
-            )
-            st.plotly_chart(fig_skew, use_container_width=True)
-            st.caption(f"Single expiry only: {expiry_label} (no longer blended across tenors).")
-        else:
-            st.info("📉 Volatility Skew surface loading...")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**⛓️ Network Activity**")
-    net_data = telemetry.get("network_activity", {})
-    with st.container(border=True):
-        nc1, nc2, nc3 = st.columns(3)
-        with nc1: st.metric("Fastest Fee", f"{net_data.get('fastest_fee_satvb', 'N/A')} sat/vB", help="Real, live data from mempool.space. Fee needed for next-block confirmation -- a rough proxy for how much on-chain demand is competing for block space right now.")
-        with nc2: st.metric("Mempool Backlog", f"{net_data.get('mempool_tx_count', 'N/A'):,}" if isinstance(net_data.get('mempool_tx_count'), int) else "N/A", help="Unconfirmed transactions waiting in the mempool. A growing backlog means more on-chain activity than the network can immediately clear.")
-        with nc3: st.metric("Congestion", net_data.get("congestion_label", "N/A"))
-        st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
+render_header("📊 Live Market Overview")
+deltas = telemetry.get("deltas", {})
+with st.container(border=True):
+    ov_r1c1, ov_r1c2, ov_r1c3, ov_r1c4 = st.columns(4)
+    spot_delta = deltas.get("spot_pct_24h")
+    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
+                    delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
+    rsi_delta = deltas.get("rsi_1h")
+    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}",
+                    delta=f"{rsi_delta:+.1f} (1h)" if rsi_delta is not None else None,
+                    help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
+    vwap_delta = deltas.get("vwap_1h_pct")
+    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
+                    delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
+                    help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+    oi_delta = deltas.get("oi_1h_pct")
+    ov_r1c4.metric("Open Interest", OPEN_INTEREST,
+                    delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
+                    help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
 
 # ==========================================
 # CONFLUENCE BOARD — at-a-glance market conditions for beginners, not a
-# trading directive. Micro (4h) remains the only VALIDATED, calibrated
-# trading-bias source on this dashboard (see the evidence in the Micro
-# card above) -- this board is a different thing: it organizes real, live
-# macro/market inputs with an honest lean per factor and an aggregate
-# read, so someone can see "conditions look broadly supportive/mixed/
-# unsupportive right now" without either (a) reading six raw numbers and
-# guessing what they mean together, or (b) being told what to do about it.
+# trading directive. Micro (4h, above) remains the only VALIDATED,
+# calibrated trading-bias source on this dashboard -- this board is a
+# different thing: it organizes real, live macro/market inputs with an
+# honest lean per factor and an aggregate read, so someone can see
+# "conditions look broadly supportive/mixed/unsupportive right now"
+# without either (a) reading six raw numbers and guessing what they mean
+# together, or (b) being told what to do about it.
 # ==========================================
 confluence = telemetry.get("confluence_board")
 if confluence:
     render_header("🧭 Confluence Board — Conditions at a Glance")
-    st.caption("Six real, live inputs to Bitcoin's broader backdrop, each with an honest lean — this is NOT a trading signal for Swing/Macro timeframes. We tested composite scores like this against ~2 years of real data and found no reliable directional edge (see Factor Research in Settings). Micro (4h, above) is the only tier with a validated, tested edge right now. Think of this as 'here's the weather,' not 'here's the trade.'")
+    st.caption("Six real, live inputs to Bitcoin's broader backdrop, each with an honest lean — this is NOT a trading signal for Swing/Macro timeframes. We tested composite scores like this against ~2 years of real data and found no reliable directional edge (see Factor Research in Settings). Micro (above) is the only tier with a validated, tested edge right now. Think of this as 'here's the weather,' not 'here's the trade.'")
 
     b, r, n = confluence.get("bullish_count", 0), confluence.get("bearish_count", 0), confluence.get("neutral_count", 0)
     fig_bar = go.Figure()
@@ -749,3 +603,113 @@ if confluence:
                 st.caption(factor["explanation"])
 
     st.caption(confluence.get("disclaimer", ""))
+
+# ==========================================
+# TELEMETRY & LIQUIDITY — supporting real market data
+# ==========================================
+render_header("🔬 Telemetry & Liquidity")
+if not telemetry:
+    st.caption("Telemetry unavailable while the backend is unreachable (see banner above).")
+else:
+    session_info = telemetry.get("session_cvd", {})
+    cvd_help = "Cumulative Volume Delta: running total of aggressive buy volume minus sell volume for this session. Positive means market buys are outweighing market sells."
+    with st.container(border=True):
+        sc1, sc2, sc3 = st.columns(3)
+        with sc1: st.metric(session_info.get("asia", {}).get("name", "Asia Open"), session_info.get("asia", {}).get("cvd", "N/A"), session_info.get("asia", {}).get("delta", ""), help=cvd_help)
+        with sc2: st.metric(session_info.get("london", {}).get("name", "London Open"), session_info.get("london", {}).get("cvd", "N/A"), session_info.get("london", {}).get("delta", ""), help=cvd_help)
+        with sc3: st.metric(session_info.get("new_york", {}).get("name", "NY Open"), session_info.get("new_york", {}).get("cvd", "N/A"), session_info.get("new_york", {}).get("delta", ""), help=cvd_help)
+    st.caption("Known limitation: sessions are bucketed by hour-of-day across a rolling 24h window, so whichever session is currently in progress shows a partial read rather than a full prior session. Not yet fixed — flagged here rather than presented as directly comparable.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    viz_col1, viz_col2 = st.columns([2, 1])
+    CHART_HEIGHT = 480  # shared by both charts so they align edge-to-edge
+
+    with viz_col1:
+      with st.container(border=True):
+        st.markdown("**🗺️ Order Book Liquidity Heatmap**")
+        z_matrix = hm_data.get("z_matrix", []) if hm_data else []
+        snapshots_collected = hm_data.get("snapshots_collected", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else 0
+        snapshots_total = hm_data.get("snapshots_total", HEATMAP_HISTORY_LEN_FALLBACK) if hm_data else HEATMAP_HISTORY_LEN_FALLBACK
+        MIN_SNAPSHOTS_TO_RENDER = 10
+
+        if len(z_matrix) > 0 and snapshots_collected >= MIN_SNAPSHOTS_TO_RENDER:
+            try:
+                z_array = np.array(z_matrix, dtype=float)
+                time_steps = hm_data.get("time_steps", [])
+                prices = hm_data.get("prices", [])
+
+                valid_vals = z_array[z_array > 0]
+                z_max = float(np.percentile(valid_vals, 98)) if valid_vals.size > 0 else 10.0
+                if z_max <= 0:
+                    z_max = 10.0
+
+                teal_colorscale = [
+                    [0.0, "#0A0E17"],
+                    [0.20, "#0F2A3D"],
+                    [0.45, "#0E7490"],
+                    [0.70, "#00C2CC"],
+                    [0.88, "#26FFDE"],
+                    [1.0, "#F0FFFC"],
+                ]
+
+                tick_idx = list(range(0, len(time_steps), 5)) if time_steps else []
+                tick_vals = [time_steps[i] for i in tick_idx]
+
+                fig_heatmap = go.Figure(data=go.Heatmap(
+                    z=z_array, x=time_steps if time_steps else None, y=prices if prices else None,
+                    colorscale=teal_colorscale, showscale=True, zmin=0.0, zmax=z_max,
+                    zsmooth=False,
+                    hovertemplate="Price: $%{y:,.0f}<br>Depth: %{z:.2f}<br>%{x}<extra></extra>",
+                    colorbar=dict(title=dict(text="Depth", font=dict(color="#8892B0")), thickness=12, len=0.8, tickfont=dict(color="#8892B0")),
+                    xgap=1, ygap=1,
+                ))
+                fig_heatmap.update_layout(
+                    height=CHART_HEIGHT, margin=dict(l=10, r=10, t=10, b=10), template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    yaxis=dict(title=dict(text="Spot Price ($)", font=dict(color="#8892B0")), tickformat="$,.0f", showgrid=True, gridcolor='rgba(255,255,255,0.05)', tickfont=dict(color="#8892B0"), automargin=True),
+                    xaxis=dict(title=dict(text="Snapshots (Older → Newer)", font=dict(color="#8892B0")), showgrid=False, tickfont=dict(color="#8892B0"), tickmode="array", tickvals=tick_vals, ticktext=tick_vals, automargin=True),
+                )
+                fig_heatmap.add_hline(y=upper_wall, line_dash="dot", line_color="#FF3366", line_width=1.5, annotation_text="Upper Wall", annotation_font=dict(color="#FF3366", size=11))
+                fig_heatmap.add_hline(y=lower_wall, line_dash="dot", line_color="#00E676", line_width=1.5, annotation_text="Lower Support", annotation_font=dict(color="#00E676", size=11))
+                fig_heatmap.add_hline(y=LIVE_SPOT_PRICE, line_dash="solid", line_color="#F5F5F5", line_width=1, opacity=0.55, annotation_text="Spot", annotation_font=dict(color="#F5F5F5", size=11), annotation_position="left")
+                st.plotly_chart(fig_heatmap, use_container_width=True)
+                st.caption("Price axis is a fixed grid that only shifts when spot trades outside it. Cells are shown unsmoothed so bucket boundaries stay accurate.")
+            except Exception:
+                st.info("🗺️ Heatmap rendering matrix...")
+        elif len(z_matrix) > 0:
+            st.info(f"🗺️ Rebuilding after a price move — collecting snapshot {snapshots_collected}/{snapshots_total}. The grid resets when spot trades outside its current range.")
+        else:
+            st.info("🗺️ Heatmap buffer initializing... collecting rolling snapshots.")
+
+    with viz_col2:
+      with st.container(border=True):
+        st.markdown("**📉 Deribit Volatility Skew**")
+        vs_data = telemetry.get("volatility_skew", {})
+        strike_vals = vs_data.get("strikes", [])
+        iv_vals = vs_data.get("iv_surface", [])
+        expiry_label = vs_data.get("expiry", "N/A")
+
+        if len(strike_vals) > 0 and len(iv_vals) > 0:
+            fig_skew = go.Figure()
+            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='rgba(0, 255, 204, 0.2)', width=8, shape='spline'), hoverinfo='skip', showlegend=False))
+            fig_skew.add_trace(go.Scatter(x=strike_vals, y=iv_vals, mode='lines', line=dict(color='#00FFCC', width=3, shape='spline'), fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.08)', showlegend=False))
+            fig_skew.update_layout(
+                height=CHART_HEIGHT, margin=dict(l=10, r=10, t=20, b=10), template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(title=dict(text="Strike Price ($)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True),
+                yaxis=dict(title=dict(text="Implied Volatility (%)", font=dict(color="#8892B0")), showgrid=True, gridcolor='rgba(255,255,255,0.05)', zeroline=False, tickfont=dict(color="#8892B0"), automargin=True)
+            )
+            st.plotly_chart(fig_skew, use_container_width=True)
+            st.caption(f"Single expiry only: {expiry_label} (no longer blended across tenors).")
+        else:
+            st.info("📉 Volatility Skew surface loading...")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("**⛓️ Network Activity**")
+    net_data = telemetry.get("network_activity", {})
+    with st.container(border=True):
+        nc1, nc2, nc3 = st.columns(3)
+        with nc1: st.metric("Fastest Fee", f"{net_data.get('fastest_fee_satvb', 'N/A')} sat/vB", help="Real, live data from mempool.space. Fee needed for next-block confirmation -- a rough proxy for how much on-chain demand is competing for block space right now.")
+        with nc2: st.metric("Mempool Backlog", f"{net_data.get('mempool_tx_count', 'N/A'):,}" if isinstance(net_data.get('mempool_tx_count'), int) else "N/A", help="Unconfirmed transactions waiting in the mempool. A growing backlog means more on-chain activity than the network can immediately clear.")
+        with nc3: st.metric("Congestion", net_data.get("congestion_label", "N/A"))
+        st.caption("This replaced the app's old \"On-Chain Exchange Flows\" section, which was never real data — it was a formula derived from trading volume and price change, not from the blockchain. This is real, live network data instead. It's a narrower signal (network congestion, not exchange-specific netflow) because genuine labeled-address exchange flow data requires a paid provider (Glassnode, CryptoQuant, etc.) with no free equivalent.")
