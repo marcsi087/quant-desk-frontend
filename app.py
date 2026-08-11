@@ -274,6 +274,30 @@ else:
     else:
         st.markdown(f"<span class='live-badge'>🟢 ALL FEEDS LIVE</span> &nbsp; {freshness}", unsafe_allow_html=True)
 
+# ==========================================
+# MARKET OVERVIEW — leads the page: the basic live numbers before anything
+# else, so there's context before the signal.
+# ==========================================
+render_header("📊 Live Market Overview")
+deltas = telemetry.get("deltas", {})
+with st.container(border=True):
+    ov_r1c1, ov_r1c2, ov_r1c3, ov_r1c4 = st.columns(4)
+    spot_delta = deltas.get("spot_pct_24h")
+    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
+                    delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
+    rsi_delta = deltas.get("rsi_1h")
+    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}",
+                    delta=f"{rsi_delta:+.1f} (1h)" if rsi_delta is not None else None,
+                    help="Momentum on a 0–100 scale. See the Glossary below for how to read it.")
+    vwap_delta = deltas.get("vwap_1h_pct")
+    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
+                    delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
+                    help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
+    oi_delta = deltas.get("oi_1h_pct")
+    ov_r1c4.metric("Open Interest", OPEN_INTEREST,
+                    delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
+                    help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
+
 # --- Wall/CVD reference values, used by Volatility Guardrail, the price
 # chart, and the heatmap further down. ---
 hm_data = telemetry.get("orderbook_heatmap", {})
@@ -307,37 +331,53 @@ with st.container(border=True):
     sig = micro_evidence.get("significance", {})
     sig_status = sig.get("status")
     min_n = telemetry.get("micro_sizing_guide", {}).get("min_sample_size", 20)
-    if sig_status == "significant_edge":
-        bias_badge(f"✓ Validated edge (z={sig.get('z_score')})", "bullish")
-    elif sig_status == "inverted_edge":
-        bias_badge(f"⚠ Inverted (z={sig.get('z_score')}) — check formula", "conflict")
-    elif sig_status == "no_significant_edge":
-        bias_badge(f"No confirmed edge yet (z={sig.get('z_score')})", "neutral")
-    else:
-        bias_badge("Insufficient data to test", "neutral")
 
-    buckets = micro_evidence.get("buckets", {})
-    ev_cols = st.columns(3)
-    for i, (bucket_key, bucket_label) in enumerate([("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]):
-        with ev_cols[i]:
-            b = buckets.get(bucket_key, {})
-            n = b.get("n", 0)
-            live_n, bt_n = b.get("live_n", 0), b.get("backtest_n", 0)
-            src_note = f"{live_n} live, {bt_n} backtest" if bt_n else f"{live_n} live"
-            if not b.get("sufficient_sample"):
-                st.caption(f"**{bucket_label}**\n\nn={n} ({src_note}) — still collecting (need {min_n})")
-            else:
-                avg_r = b.get("avg_return_pct")
-                pct_pos = b.get("pct_positive")
-                sign = "+" if avg_r is not None and avg_r >= 0 else ""
-                st.caption(f"**{bucket_label}**\n\navg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
-
-    if sig_status == "inverted_edge":
+    if sig_status in (None, "insufficient_data"):
+        # Not enough logged history yet to compute real significance --
+        # sig_status only leaves "insufficient_data" when at least one of
+        # the bullish/bearish buckets still lacks enough sample, which
+        # means the bucket grid below would ALSO be mostly placeholders.
+        # This instance's score_history resets on every redeploy (Render's
+        # free-tier disk is ephemeral), so this state is common right after
+        # shipping changes. One honest, actionable line beats a grid of
+        # "still collecting" placeholders across four separate UI elements,
+        # which reads as broken rather than as a tool honestly waiting on data.
         status_card(
-            "⚠️ <b>Statistically significant INVERTED relationship</b> — the bias label and the actual "
-            "historical outcome point opposite directions. Treat the badge above with extra caution until "
-            "the formula is revisited.", "conflict",
+            "⏳ <b>Evidence is still accumulating for this instance</b> — likely because recent updates reset "
+            "the tracking history (Render's free-tier disk wipes on redeploy). Run a historical backtest from "
+            "Settings to populate this instantly from real past data, or check back once more live activity "
+            "has logged.", "info",
         )
+    else:
+        if sig_status == "significant_edge":
+            bias_badge(f"✓ Validated edge (z={sig.get('z_score')})", "bullish")
+        elif sig_status == "inverted_edge":
+            bias_badge(f"⚠ Inverted (z={sig.get('z_score')}) — check formula", "conflict")
+        else:
+            bias_badge(f"No confirmed edge yet (z={sig.get('z_score')})", "neutral")
+
+        buckets = micro_evidence.get("buckets", {})
+        ev_cols = st.columns(3)
+        for i, (bucket_key, bucket_label) in enumerate([("bullish", "When Bullish"), ("bearish", "When Bearish"), ("neutral", "When Neutral")]):
+            with ev_cols[i]:
+                b = buckets.get(bucket_key, {})
+                n = b.get("n", 0)
+                live_n, bt_n = b.get("live_n", 0), b.get("backtest_n", 0)
+                src_note = f"{live_n} live, {bt_n} backtest" if bt_n else f"{live_n} live"
+                if not b.get("sufficient_sample"):
+                    st.caption(f"**{bucket_label}**\n\nn={n} ({src_note}) — still collecting (need {min_n})")
+                else:
+                    avg_r = b.get("avg_return_pct")
+                    pct_pos = b.get("pct_positive")
+                    sign = "+" if avg_r is not None and avg_r >= 0 else ""
+                    st.caption(f"**{bucket_label}**\n\navg {sign}{avg_r}% · {pct_pos}% positive · n={n} ({src_note})")
+
+        if sig_status == "inverted_edge":
+            status_card(
+                "⚠️ <b>Statistically significant INVERTED relationship</b> — the bias label and the actual "
+                "historical outcome point opposite directions. Treat the badge above with extra caution until "
+                "the formula is revisited.", "conflict",
+            )
 
     st.markdown("<hr style='border:0.5px solid #333; margin: 16px 0;'>", unsafe_allow_html=True)
     sizing = telemetry.get("micro_sizing_guide", {})
@@ -424,93 +464,6 @@ if price_chart_data:
         st.plotly_chart(fig_price, use_container_width=True)
         st.caption("Real hourly candles from Binance. VWAP and liquidity walls are the same live levels referenced throughout this page — this is where they actually are relative to price.")
 
-# --- Factor Research report (only shown after a run this session) ---
-research_report = st.session_state.get("last_research_report")
-if research_report and research_report.get("report"):
-    render_header("🔬 Factor Research — Which Inputs Actually Predict Returns")
-    st.caption(research_report.get("note", ""))
-    for horizon_label, features in research_report["report"].items():
-        with st.container(border=True):
-            st.markdown(f"**{horizon_label} forward return**")
-            rf_cols = st.columns(4)
-            for i, (feat_name, feat_data) in enumerate(features.items()):
-                with rf_cols[i % 4]:
-                    full = feat_data.get("full_period", {})
-                    non_overlap = feat_data.get("non_overlapping", {})
-                    r = full.get("r")
-                    r_no = non_overlap.get("r")
-                    robust = feat_data.get("robust")
-                    robust_naive = feat_data.get("robust_naive")
-                    no_n = non_overlap.get("n")
-                    r_no_str = f"{r_no:+.3f}" if r_no is not None else "N/A"
-                    if r is None:
-                        bias_badge(feat_name, "neutral")
-                    elif robust:
-                        bias_badge(f"{feat_name}: r={r_no:+.3f} ✓ robust (n={no_n} independent)", "bullish" if r_no > 0 else "bearish")
-                    elif robust_naive:
-                        bias_badge(f"{feat_name}: r={r:+.3f} full-period (fails non-overlap: r={r_no_str} at n={no_n})", "neutral")
-                    elif full.get("significant"):
-                        bias_badge(f"{feat_name}: r={r:+.3f} (not consistent across periods)", "neutral")
-                    else:
-                        bias_badge(f"{feat_name}: r={r:+.3f} (no signal)", "neutral")
-
-# --- Calibration result (only shown after a run this session) ---
-calibration = st.session_state.get("last_calibration")
-if calibration and calibration.get("fit_non_overlapping"):
-    render_header("⚖️ Calibrated Formula")
-    fit_no = calibration["fit_non_overlapping"]
-    fit_ov = calibration.get("fit_overlapping", {})
-    if "error" in fit_no:
-        st.warning(f"Fit didn't converge: {fit_no['error']}")
-    else:
-        st.caption(calibration.get("note", ""))
-        with st.container(border=True):
-            st.markdown(f"**{calibration.get('horizon')} forward return — fitted on n={fit_no['n']} non-overlapping windows, R²={fit_no['r_squared']}**")
-            formula_parts = [f"{fit_no['intercept']:+.4f}"]
-            for feat, coef in fit_no["coefficients"].items():
-                formula_parts.append(f"{coef:+.4f}×{feat}")
-            st.code("forward_return ≈ " + " ".join(formula_parts))
-            if "coefficients" in fit_ov:
-                st.caption("For comparison, the (less trustworthy) overlapping-sample fit: " + ", ".join(f"{k}={v:+.4f}" for k, v in fit_ov["coefficients"].items()) + f", intercept={fit_ov.get('intercept', 0):+.4f}")
-
-oos_result = st.session_state.get("last_oos_result")
-if oos_result and oos_result.get("train_fit"):
-    render_header("🔬 Out-of-Sample Test Result")
-    train_fit = oos_result["train_fit"]
-    oos_data = oos_result.get("out_of_sample_result", {})
-    if "error" in train_fit:
-        st.warning(f"Training fit didn't converge: {train_fit['error']}")
-    elif "error" in oos_data:
-        st.warning(f"Couldn't evaluate the held-out set: {oos_data['error']}")
-    else:
-        st.caption(oos_result.get("note", ""))
-        with st.container(border=True):
-            st.markdown(f"**{oos_result.get('horizon')} forward return — trained on the earliest {oos_result.get('train_frac', 0)*100:.0f}% ({oos_result.get('train_window_size')} windows), tested on the remaining {oos_result.get('test_window_size')} windows it never saw**")
-            formula_parts = [f"{train_fit['intercept']:+.4f}"]
-            for feat, coef in train_fit["coefficients"].items():
-                formula_parts.append(f"{coef:+.4f}×{feat}")
-            st.code("forward_return ≈ " + " ".join(formula_parts) + "   (frozen, fit on training portion only)")
-
-            in_sample_r2 = train_fit.get("r_squared")
-            oos_r2 = oos_data.get("out_of_sample_r_squared")
-            corr = oos_data.get("predicted_vs_actual_correlation", {})
-            corr_significant = corr.get("significant", False)
-            oos_col1, oos_col2 = st.columns(2)
-            oos_col1.metric("In-sample R² (training portion)", f"{in_sample_r2}")
-            oos_col2.metric("Out-of-sample R² (held-out portion)", f"{oos_r2}")
-
-            if oos_r2 is None:
-                verdict_kind, verdict = "info", "Not enough held-out data to draw a conclusion."
-            elif oos_r2 <= 0:
-                verdict_kind, verdict = "conflict", "❌ Negative out-of-sample R² — the frozen formula did WORSE than just guessing the training average on data it never saw. The in-sample fit does not appear to reflect a real, generalizing relationship."
-            elif corr_significant:
-                verdict_kind, verdict = "bullish", "✅ Positive AND statistically significant on data the formula never saw — this is real, if modest, evidence of a genuine relationship, not just a fit to one sample."
-            else:
-                verdict_kind, verdict = "neutral", "⚠️ Out-of-sample R² is positive, but the predicted-vs-actual correlation on the held-out set is NOT statistically significant — this result is not yet distinguishable from what pure chance could produce at this sample size. Treat this as unresolved, not as confirmed."
-            status_card(verdict, verdict_kind)
-            if corr:
-                st.caption(f"Predicted-vs-actual correlation on the held-out set: r={corr.get('r')}, n={corr.get('n')}, {'significant' if corr_significant else 'not significant'} — this significance test is what the verdict above is actually based on.")
-
 with st.expander("📖 Glossary — What These Terms Mean"):
     st.markdown("""
 - **RSI (Relative Strength Index)**: measures how fast and how far price has moved recently, on a 0–100 scale. Above ~70 is often called "overbought," below ~30 "oversold" — but in a strong trend it can stay extreme for a while, so it's a momentum gauge, not a timing signal on its own.
@@ -524,28 +477,7 @@ with st.expander("📖 Glossary — What These Terms Mean"):
 - **Out-of-Sample Testing**: fitting a formula on only part of the historical data, then checking whether it actually predicts the remaining part it never saw. The strongest check this tool has for telling a real relationship apart from one that just happened to fit its own training data.
 """)
 
-# ==========================================
-# MARKET OVERVIEW — supporting live data
-# ==========================================
-render_header("📊 Live Market Overview")
-deltas = telemetry.get("deltas", {})
-with st.container(border=True):
-    ov_r1c1, ov_r1c2, ov_r1c3, ov_r1c4 = st.columns(4)
-    spot_delta = deltas.get("spot_pct_24h")
-    ov_r1c1.metric("Live Spot", f"${LIVE_SPOT_PRICE:,.2f}",
-                    delta=f"{spot_delta:+.2f}% (24h)" if spot_delta is not None else None)
-    rsi_delta = deltas.get("rsi_1h")
-    ov_r1c2.metric("RSI(14, Wilder)", f"{ta.get('rsi', 50.0):.1f}",
-                    delta=f"{rsi_delta:+.1f} (1h)" if rsi_delta is not None else None,
-                    help="Momentum on a 0–100 scale. See the Glossary above for how to read it.")
-    vwap_delta = deltas.get("vwap_1h_pct")
-    ov_r1c3.metric("Session VWAP (UTC)", f"${ta.get('vwap', LIVE_SPOT_PRICE):,.2f}",
-                    delta=f"{vwap_delta:+.3f}% (1h)" if vwap_delta is not None else None,
-                    help="Volume-weighted average price since 00:00 UTC. Price above this line is generally read as buyers in control.")
-    oi_delta = deltas.get("oi_1h_pct")
-    ov_r1c4.metric("Open Interest", OPEN_INTEREST,
-                    delta=f"{oi_delta:+.2f}% (1h)" if oi_delta is not None else None,
-                    help="Total outstanding futures contracts. Rising OI with a price move suggests new money entering the trend.")
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ==========================================
 # CONFLUENCE BOARD — at-a-glance market conditions for beginners, not a
