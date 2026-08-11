@@ -523,6 +523,12 @@ if magnitude_report and magnitude_report.get("report"):
             else:
                 status_card(f"⚠️ <b>Squeeze Risk banner is NOT yet empirically confirmed</b> — extreme funding at 4h shows r={r:+.3f} but does not clear the corrected robustness bar (n={no_n} independent windows). The banner's underlying mechanism is real finance, but this specific claim hasn't been validated the way Micro's actual score was.", "neutral")
 
+    oi_quality = magnitude_report.get("oi_data_quality", {})
+    if oi_quality:
+        oi_kind = "bullish" if oi_quality.get("tested") else "neutral"
+        oi_icon = "📊" if oi_quality.get("tested") else "ℹ️"
+        status_card(f"{oi_icon} <b>Open Interest coverage:</b> {oi_quality.get('note', '')}", oi_kind)
+
     for horizon_label, features in magnitude_report["report"].items():
         with st.container(border=True):
             st.markdown(f"**{horizon_label} — extremity vs. move size**")
