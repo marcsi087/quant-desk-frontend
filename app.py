@@ -195,11 +195,11 @@ with header_col2:
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**📈 Bootstrap Track Record**")
         st.caption("Seeds the Track Record from real historical BTC price data instead of waiting on live traffic. Every backtested row is tagged separately from live-observed data. 24 months is recommended — Macro's 14-day horizon needs a longer window to build enough non-overlapping samples per bucket.")
-        bt_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="bt_months")
+        bt_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="bt_months")
         if st.button("Run Historical Backtest"):
             with st.spinner("Fetching historical data and reconstructing scores — this can take a minute..."):
                 try:
-                    bt_resp = requests.post(f"{API_URL}/backtest/run", params={"months": int(bt_months)}, timeout=180)
+                    bt_resp = requests.post(f"{API_URL}/backtest/run", params={"months": int(bt_months)}, timeout=600)
                     bt_result = bt_resp.json() if bt_resp.status_code == 200 else {"status": "error", "error": f"HTTP {bt_resp.status_code}"}
                 except Exception as e:
                     bt_result = {"status": "error", "error": str(e)}
@@ -216,11 +216,12 @@ with header_col2:
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**🔬 Factor Research**")
         st.caption("Tests each raw input against real forward returns, independently — now 14 features: the original 8 (RSI, VWAP divergence, funding, DXY, yields, VIX, S&P) plus order-flow imbalance, 3/7/14-day momentum, and volatility regime, added to give Swing and Macro's own horizons a fairer test. Read-only: never changes the live formulas by itself.")
-        fr_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="fr_months")
+        st.caption("Window now goes up to 90 months (Binance BTCUSDT perpetuals have traded since ~2019) instead of 36 — this directly targets the 14d/Macro sample-size problem (only ~25-52 independent windows at 24 months). Longer windows take proportionally longer to fetch; pagination is sequential, so expect several minutes near the upper end, not seconds.")
+        fr_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="fr_months")
         if st.button("Run Factor Research"):
             with st.spinner("Reconstructing feature history and testing correlations — this can take a minute..."):
                 try:
-                    fr_resp = requests.post(f"{API_URL}/research/run", params={"months": int(fr_months)}, timeout=180)
+                    fr_resp = requests.post(f"{API_URL}/research/run", params={"months": int(fr_months)}, timeout=600)
                     fr_result = fr_resp.json() if fr_resp.status_code == 200 else {"status": "error", "error": f"HTTP {fr_resp.status_code}"}
                 except Exception as e:
                     fr_result = {"status": "error", "error": str(e)}
@@ -235,11 +236,11 @@ with header_col2:
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**💥 Magnitude Research (Squeeze Risk Test)**")
         st.caption("Different question than Factor Research: does extreme funding (or extreme VIX, momentum, order flow, or elevated volatility) predict a BIGGER subsequent move, regardless of direction? This is the actual hypothesis behind the Squeeze Risk banner — never tested until now. Read-only, same non-overlap correction as Factor Research.")
-        mag_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="mag_months")
+        mag_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="mag_months")
         if st.button("Run Magnitude Research"):
             with st.spinner("Testing whether extremity predicts move size — this can take a minute..."):
                 try:
-                    mag_resp = requests.post(f"{API_URL}/research/run-magnitude", params={"months": int(mag_months)}, timeout=180)
+                    mag_resp = requests.post(f"{API_URL}/research/run-magnitude", params={"months": int(mag_months)}, timeout=600)
                     mag_result = mag_resp.json() if mag_resp.status_code == 200 else {"status": "error", "error": f"HTTP {mag_resp.status_code}"}
                 except Exception as e:
                     mag_result = {"status": "error", "error": str(e)}
@@ -256,14 +257,14 @@ with header_col2:
         st.caption("Fits actual regression coefficients for a short, evidence-backed feature list against real forward returns — only pass features that already showed 'robust: true' in Factor Research above. Read-only: shows you the fitted numbers, doesn't rewrite any formula by itself.")
         cal_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="cal_horizon")
         cal_features = st.text_input("Features (comma-separated)", value="vix_pct,spx_pct", key="cal_features")
-        cal_months = st.number_input("Months of history", min_value=1, max_value=36, value=24, step=1, key="cal_months")
+        cal_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="cal_months")
         if st.button("Run Calibration"):
             with st.spinner("Fitting regression on the non-overlapping sample — this can take a minute..."):
                 try:
                     cal_resp = requests.post(
                         f"{API_URL}/research/calibrate",
                         params={"months": int(cal_months), "horizon": cal_horizon, "features": cal_features},
-                        timeout=180,
+                        timeout=600,
                     )
                     cal_result = cal_resp.json() if cal_resp.status_code == 200 else {"status": "error", "error": f"HTTP {cal_resp.status_code}"}
                 except Exception as e:
