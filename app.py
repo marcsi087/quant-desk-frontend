@@ -537,6 +537,52 @@ if confluence:
     st.caption(confluence.get("disclaimer", ""))
 
 # ==========================================
+# ECONOMIC CALENDAR — real, publicly-scheduled CPI and FOMC dates, with
+# generic educational context. Same honesty rule as the rest of Confluence
+# Board: dates and release mechanics are facts, "how markets have tended
+# to react" is general historical framing, NOT a claim we've specifically
+# tested for BTC.
+# ==========================================
+econ_cal = telemetry.get("economic_calendar")
+if econ_cal:
+    render_header("📅 Economic Calendar — CPI & FOMC")
+    st.caption("Real, publicly-scheduled dates from the Federal Reserve and Bureau of Labor Statistics — not a prediction of what the reports will say, and not a trading signal. See the note below.")
+
+    cal_col1, cal_col2 = st.columns(2)
+    with cal_col1:
+        with st.container(border=True):
+            st.markdown("**📊 Next CPI Release**")
+            next_cpi = econ_cal.get("next_cpi", {})
+            if next_cpi.get("date"):
+                st.metric("Date", next_cpi["date"], help=f"Releases at {next_cpi.get('time_et', '8:30 AM ET')}")
+                days = next_cpi.get("days_until")
+                if days == 0:
+                    st.caption("📍 That's today.")
+                elif days is not None:
+                    st.caption(f"{days} day{'s' if days != 1 else ''} away.")
+            else:
+                st.warning(next_cpi.get("note", "No upcoming date on file."))
+            st.caption(econ_cal.get("cpi_education", ""))
+
+    with cal_col2:
+        with st.container(border=True):
+            st.markdown("**🏛️ Next FOMC Meeting**")
+            next_fomc = econ_cal.get("next_fomc", {})
+            if next_fomc.get("date"):
+                dot_plot_note = " (includes the dot plot)" if next_fomc.get("has_dot_plot") else ""
+                st.metric("Statement Date", next_fomc["date"] + dot_plot_note, help=next_fomc.get("time_et", ""))
+                days = next_fomc.get("days_until")
+                if days == 0:
+                    st.caption("📍 That's today.")
+                elif days is not None:
+                    st.caption(f"{days} day{'s' if days != 1 else ''} away.")
+            else:
+                st.warning(next_fomc.get("note", "No upcoming date on file."))
+            st.caption(econ_cal.get("fomc_education", ""))
+
+    st.caption(f"Dates last verified {econ_cal.get('last_verified', 'N/A')} against federalreserve.gov and bls.gov. " + econ_cal.get("disclaimer", ""))
+
+# ==========================================
 # TELEMETRY & LIQUIDITY — supporting real market data
 # ==========================================
 render_header("🔬 Telemetry & Liquidity")
