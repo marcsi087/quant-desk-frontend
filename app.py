@@ -251,6 +251,34 @@ with header_col2:
             else:
                 st.error(f"Out-of-sample test failed: {oos_result.get('error', 'unknown error')}")
 
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**🎯 Direction × Magnitude Joint Study**")
+        st.caption("Tests whether Micro's real win rate genuinely differs between elevated and normal Volatility Guardrail regimes — the direct evidence for or against combining direction and magnitude into one metric, tested empirically rather than assumed from intuition.")
+        joint_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="joint_months")
+        if st.button("Run Joint Study"):
+            with st.spinner("Reconstructing direction and magnitude jointly across history — this can take a minute..."):
+                try:
+                    joint_resp = requests.post(f"{API_URL}/research/run-joint-study", params={"months": int(joint_months)}, timeout=600)
+                    joint_result = joint_resp.json() if joint_resp.status_code == 200 else {"status": "error", "error": f"HTTP {joint_resp.status_code}"}
+                except Exception as e:
+                    joint_result = {"status": "error", "error": str(e)}
+            if joint_result.get("status") == "completed" and "error" in joint_result:
+                st.error(f"Joint study couldn't run: {joint_result['error']}")
+            elif joint_result.get("status") == "completed":
+                bull_test = joint_result.get("bullish_elevated_vs_normal", {})
+                bear_test = joint_result.get("bearish_elevated_vs_normal", {})
+                bull_status, bear_status = bull_test.get("status"), bear_test.get("status")
+                if bull_status == "elevated_regime_stronger" or bear_status == "elevated_regime_stronger":
+                    st.success(f"Real evidence found — Bullish: {bull_status} (z={bull_test.get('z_score')}), Bearish: {bear_status} (z={bear_test.get('z_score')})")
+                elif bull_status == "insufficient_data" and bear_status == "insufficient_data":
+                    st.warning("Not enough elevated-regime samples yet at this window length — try a longer history.")
+                else:
+                    st.info(f"No significant difference found — Bullish: {bull_status} (z={bull_test.get('z_score')}), Bearish: {bear_status} (z={bear_test.get('z_score')}). Honest null result, not an error.")
+            elif joint_result.get("status") == "already_running":
+                st.warning("A joint study is already running — check back shortly.")
+            else:
+                st.error(f"Joint study failed: {joint_result.get('error', 'unknown error')}")
+
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
 else:
