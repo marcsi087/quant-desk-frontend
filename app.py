@@ -188,6 +188,31 @@ with header_col2:
                 st.error(f"Research failed: {fr_result.get('error', 'unknown error')}")
 
         st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**📏 Magnitude Research**")
+        st.caption("A different question than Factor Research above: does a feature predict a BIGGER move regardless of direction? Includes near_session_transition — tests whether magnitude clusters around the Asia/London/NY session boundaries the dashboard already tracks.")
+        mag_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="mag_months")
+        if st.button("Run Magnitude Research"):
+            with st.spinner("Reconstructing feature history and testing magnitude correlations — this can take a minute..."):
+                try:
+                    mag_resp = requests.post(f"{API_URL}/research/run-magnitude", params={"months": int(mag_months)}, timeout=600)
+                    mag_result = mag_resp.json() if mag_resp.status_code == 200 else {"status": "error", "error": f"HTTP {mag_resp.status_code}"}
+                except Exception as e:
+                    mag_result = {"status": "error", "error": str(e)}
+            if mag_result.get("status") == "completed" and "error" in mag_result:
+                st.error(f"Magnitude research couldn't run: {mag_result['error']}")
+            elif mag_result.get("status") == "completed":
+                session_feat = mag_result.get("report", {}).get("4h", {}).get("near_session_transition", {})
+                non_overlap = session_feat.get("non_overlapping", {})
+                if non_overlap.get("significant"):
+                    st.success(f"Session-transition timing: r={non_overlap.get('r')} at 4h, n={non_overlap.get('n')} — robust: {session_feat.get('robust')}. Analyzed {mag_result.get('rows_analyzed', 0)} points overall.")
+                else:
+                    st.info(f"Session-transition timing: r={non_overlap.get('r')} at 4h, not significant at this sample size. Analyzed {mag_result.get('rows_analyzed', 0)} points overall.")
+            elif mag_result.get("status") == "already_running":
+                st.warning("Magnitude research is already running — check back shortly.")
+            else:
+                st.error(f"Magnitude research failed: {mag_result.get('error', 'unknown error')}")
+
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
         st.markdown("**⚖️ Calibrate Formula**")
         st.caption("Fits actual regression coefficients for a short, evidence-backed feature list against real forward returns — only pass features that already showed 'robust: true' in Factor Research above. Read-only: shows you the fitted numbers, doesn't rewrite any formula by itself.")
         cal_horizon = st.selectbox("Horizon", ["4h", "2d", "14d"], key="cal_horizon")
@@ -278,6 +303,34 @@ with header_col2:
                 st.warning("A joint study is already running — check back shortly.")
             else:
                 st.error(f"Joint study failed: {joint_result.get('error', 'unknown error')}")
+
+        st.markdown("<hr style='border:1px solid #333; margin: 12px 0;'>", unsafe_allow_html=True)
+        st.markdown("**🌊 CVD Absorption vs Momentum**")
+        st.caption("Tests two signatures of heavy one-sided order flow: momentum (flow that moved price roughly proportionally) vs absorption (heavy flow, price barely moved — a large passive counterparty likely absorbed it). Does momentum tend to continue while absorption tends to reverse?")
+        cvd_months = st.number_input("Months of history", min_value=1, max_value=90, value=24, step=1, key="cvd_months")
+        if st.button("Run CVD Study"):
+            with st.spinner("Reconstructing order flow and price action jointly across history — this can take a minute..."):
+                try:
+                    cvd_resp = requests.post(f"{API_URL}/research/run-cvd-study", params={"months": int(cvd_months)}, timeout=600)
+                    cvd_result = cvd_resp.json() if cvd_resp.status_code == 200 else {"status": "error", "error": f"HTTP {cvd_resp.status_code}"}
+                except Exception as e:
+                    cvd_result = {"status": "error", "error": str(e)}
+            if cvd_result.get("status") == "completed" and "error" in cvd_result:
+                st.error(f"CVD study couldn't run: {cvd_result['error']}")
+            elif cvd_result.get("status") == "completed":
+                sig = cvd_result.get("momentum_vs_absorption", {})
+                status = sig.get("status")
+                mom, abso = cvd_result.get("momentum", {}), cvd_result.get("absorption", {})
+                if status in ("momentum_continues_more", "absorption_continues_more"):
+                    st.success(f"Real evidence found — {status} (z={sig.get('z_score')}). Momentum continuation: {mom.get('continuation_rate_pct')}% (n={mom.get('n')}), Absorption continuation: {abso.get('continuation_rate_pct')}% (n={abso.get('n')})")
+                elif status == "insufficient_data":
+                    st.warning("Not enough heavy-flow samples yet at this window length — try a longer history.")
+                else:
+                    st.info(f"No significant difference found (z={sig.get('z_score')}). Honest null result, not an error.")
+            elif cvd_result.get("status") == "already_running":
+                st.warning("A CVD study is already running — check back shortly.")
+            else:
+                st.error(f"CVD study failed: {cvd_result.get('error', 'unknown error')}")
 
 if not telemetry:
     st.error(f"⚠️ Backend unreachable — no data to show. {st.session_state.get('_fetch_error', '')}")
