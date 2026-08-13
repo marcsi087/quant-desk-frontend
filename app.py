@@ -337,7 +337,7 @@ with header_col2:
         st.caption("A different data RESOLUTION than every other tool above, not a new combination of the same hourly features -- tests whether a large, fast (5-min) price move tends to partially reverse in the following 15 minutes. Deliberately capped at a much smaller window than the hourly tools (1-minute data is ~60x denser per day) and tested against an empirical shuffle-test baseline, not a naive 50/50 -- a naive baseline was tried first and produced false positives on pure noise.")
         spike_days = st.number_input("Days of history", min_value=1, max_value=90, value=30, step=1, key="spike_days")
         if st.button("Run Spike & Reversion Study"):
-            with st.spinner("Fetching minute-level data and running the shuffle-test baseline — this can take a minute or two..."):
+            with st.spinner("Fetching minute-level data and running the shuffle-test baseline on the full period plus both halves — this can take a couple minutes..."):
                 try:
                     spike_resp = requests.post(f"{API_URL}/research/run-spike-study", params={"days": int(spike_days)}, timeout=600)
                     spike_result = spike_resp.json() if spike_resp.status_code == 200 else {"status": "error", "error": f"HTTP {spike_resp.status_code}"}
@@ -351,8 +351,13 @@ with header_col2:
                 observed = spike_result.get("observed_reversion_rate_pct")
                 null_mean = spike_result.get("null_distribution_mean_pct")
                 n_events = spike_result.get("total_events")
+                robustness = spike_result.get("robustness_check", {})
                 if status in ("spikes_revert_more_than_baseline", "spikes_revert_less_than_baseline"):
-                    st.success(f"Real evidence found — {status} (z={sig.get('z_score')}). Observed reversion: {observed}% vs shuffle-test baseline: {null_mean}% (n={n_events} events, {spike_result.get('n_shuffles')} shuffles)")
+                    if robustness.get("robust"):
+                        st.success(f"Real evidence found, and it's CONSISTENT across both halves of the window — {status} (z={sig.get('z_score')}). Observed reversion: {observed}% vs shuffle-test baseline: {null_mean}% (n={n_events} events).")
+                    else:
+                        fh, sh = robustness.get("first_half", {}), robustness.get("second_half", {})
+                        st.warning(f"Full period shows {status} (z={sig.get('z_score')}), but this did NOT hold consistently in both halves — first half: {fh.get('status')} (z={fh.get('z_score')}), second half: {sh.get('status')} (z={sh.get('z_score')}). Treat as unconfirmed, not as a validated finding, until it clears this same bar.")
                 elif status == "insufficient_data" or "error" in spike_result:
                     st.warning("Not enough spike events or shuffle data at this window length — try more days.")
                 else:
