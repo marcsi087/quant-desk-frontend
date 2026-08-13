@@ -357,7 +357,15 @@ with header_col2:
                         st.success(f"Real evidence found, and it's CONSISTENT across both halves of the window — {status} (z={sig.get('z_score')}). Observed reversion: {observed}% vs shuffle-test baseline: {null_mean}% (n={n_events} events).")
                     else:
                         fh, sh = robustness.get("first_half", {}), robustness.get("second_half", {})
-                        st.warning(f"Full period shows {status} (z={sig.get('z_score')}), but this did NOT hold consistently in both halves — first half: {fh.get('status')} (z={fh.get('z_score')}), second half: {sh.get('status')} (z={sh.get('z_score')}). Treat as unconfirmed, not as a validated finding, until it clears this same bar.")
+                        def half_desc(h):
+                            if h.get("status") == "error":
+                                return f"COULD NOT COMPUTE ({h.get('error', 'unknown reason')})"
+                            return f"{h.get('status')} (z={h.get('z_score')}, n={h.get('n_events')} events)"
+                        any_half_errored = fh.get("status") == "error" or sh.get("status") == "error"
+                        if any_half_errored:
+                            st.warning(f"Full period shows {status} (z={sig.get('z_score')}), but the half-period check couldn't fully run — first half: {half_desc(fh)} — second half: {half_desc(sh)}. This is an incomplete check, NOT a negative finding — try more days so each half has enough data on its own.")
+                        else:
+                            st.warning(f"Full period shows {status} (z={sig.get('z_score')}), but this did NOT hold consistently in both halves — first half: {half_desc(fh)} — second half: {half_desc(sh)}. Treat as unconfirmed, not as a validated finding, until it clears this same bar.")
                 elif status == "insufficient_data" or "error" in spike_result:
                     st.warning("Not enough spike events or shuffle data at this window length — try more days.")
                 else:
