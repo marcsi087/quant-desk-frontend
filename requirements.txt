@@ -1,7 +1,7 @@
 streamlit
 pandas
-numpy
-plotly
-requests
 streamlit>=1.31
 streamlit-autorefresh==1.0.1
+plotly>=5.18
+requests>=2.31
+numpy>=1.26
